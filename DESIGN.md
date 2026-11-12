@@ -44,7 +44,7 @@
 | 作図も別プロセス・検証を軽く | 約440MB |
 | 高度は 500hPa だけ | **約347MB**（待機時 約36MB・作図後 約36MB） |
 
-Linux（Render）では値が変わる。デプロイ後に確認する（[DEPLOY.md](DEPLOY.md)）。
+**Render（Linux・無料枠512MB）の実測（2026-11-12）**: 作図・展開プロセスの最大メモリ **197MB**（GFS・断面1枚を2回）・所要時間 72〜75秒。macOS より小さく出る。サーバー本体（約36MB）を足しても約240MB で、十分な余裕がある。作図のたびに Logs へ「作図・展開プロセスの最大メモリ ○○MB（起動後の最大）」を出している（無料枠は Metrics にメモリが出ないため）。
 
 ## 応答の形（画面との約束）
 - `GET /api/xsection` → `{"state":"done","name","url":"/img/…","label","model","initText","ft","legal"}` または `202 {"state":"queued","job","position"}`。

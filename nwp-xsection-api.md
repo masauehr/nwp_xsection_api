@@ -1,6 +1,6 @@
 # nwp_xsection_api — 公開サイトから断面図を作る API（マニュアル）
 
-作成: 2026-11-12 ／ 状態: **ローカルで実装・検証済み。GitHub への公開と Render へのデプロイは未実施**（手順は [DEPLOY.md](DEPLOY.md)）
+作成: 2026-11-12 ／ 状態: **Render にデプロイ済み・作図と公開の設定（`publish: true`）まで確認済み。公開サイトの画面での有効化（`config.js` に URL）と、合言葉での公開の実地確認は未実施**（手順は [DEPLOY.md](DEPLOY.md)）
 
 [← nwp-chart-web.md（数値モデル天気図ビューア）](nwp-chart-web.md)
 
@@ -48,7 +48,7 @@
 
 ## 3. 仕組み（運用する人向け）
 - 実体は Render 上の小さな Python サーバー（[README.md](README.md)）。作図は**1件ずつ**（同時に走らせない）で、待ち行列は3件まで。
-- 作図ごと・GRIB2の展開ごとに**別プロセス**で行い、終われば全メモリが戻る。**合計メモリの最大は約347MB**（手元の実測。Render の無料枠は512MB）。
+- 作図ごと・GRIB2の展開ごとに**別プロセス**で行い、終われば全メモリが戻る。**Render の実測は、1プロセスの最大 197MB・所要 72〜75秒**（無料枠は512MB。手元の Mac では合計 約347MB）。Logs の「作図完了」の行に、作図のたびに最大メモリが出る。
 - 作図結果は Render の `/tmp` に短期保存（40件まで）。**確定した図だけ**を、公開時に GitHub の gh-pages ブランチ（`output/custom/` の画像と `list.json`）へ書き込む。これでサーバーに永続ディスクがなくても公開できる。
 - 公開サイトの `list.json` は、ローカルの `publish.py --custom` と同じ形式なので、ローカルで載せた図と混ざっても壊れない（`by` に公開した人の呼び名が入る）。
 - 設計の判断と根拠は [DESIGN.md](DESIGN.md)。
@@ -72,9 +72,11 @@ python tools/make_key.py tanaka        # 合言葉（相手に渡す）と、API
 - 作図は認証なしなので、回数制限（1時間に1つのIPで8回・全体で60回）と待ち行列で負荷を守っている。使われすぎるときは `RENDER_PER_HOUR`・`GLOBAL_PER_HOUR` を下げる。
 - ECMWF オープンデータは CC BY 4.0（出典明記）、GFS は NOAA（出典明記を推奨）。画面に出る `legal` の文言を消さない。
 - Render の**無料枠は約15分でスリープ**する。再開に約50秒。常時起動にするには Starter（月$7）。
-- 未確認（デプロイして初めて分かること）: Docker ビルド（pygrib）・Render 上のメモリと所要時間・日本語フォント・クライアントIPの取り方。確認項目は [plan.md](plan.md) と [DEPLOY.md](DEPLOY.md)。
+- Render の前段には Cloudflare があり、回数制限のIPは `X-Forwarded-For` の右から2番目の公開アドレス（`TRUSTED_HOPS=2`）で取る。`/api/health` の `ip` が自分のIPで安定していることを確認済み。
+- 未確認: 公開サイトの画面からの作図と、合言葉での公開（GitHub への書き込み）の実地確認、ECMWF の所要時間。確認項目は [plan.md](plan.md)。
 
 ## 6. 改修履歴
 | 日付 | 内容 |
 |---|---|
 | 2026-11-12 | 新規作成。nwp_chart_web の自由選択（断面図）を切り出し、cartopy・metpy を外して軽量化（小地図は coast.json・相当温位は numpy）。作図ジョブ（非同期・ポーリング）・回数制限・CORS・合言葉つき公開（GitHub Contents API）を実装。実データ（GFS・ECMWF）で作図し、合計メモリの最大 約347MB を確認。テスト72件。nwp_chart_web の画面に `web/config.js`（API の URL）を追加し、公開サイトの再現環境で画面から作図できることを確認 |
+| 2026-11-12 | Render にデプロイ。Dockerfile の `opts.py` コピー漏れ・クライアントIP（Render 内部の 10.x と前段の Cloudflare を飛ばす・`TRUSTED_HOPS=2`）を修正。作図ログに最大メモリを出すよう追加。実機で作図でき、最大メモリ 197MB・72〜75秒を確認 |

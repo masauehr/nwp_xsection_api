@@ -30,17 +30,19 @@
 - [x] 4. 画面側（nwp_chart_web）に API 先の設定 `web/config.js` を追加（空なら従来どおり閲覧専用）
   - ローカルで、API と公開サイトの再現環境をつないで画面から作図できることを確認
 - [x] 5. ドキュメント（README・DESIGN・DEPLOY・CLAUDE・マニュアル）
-- [ ] 6. GitHub に公開リポジトリを作り push（**ユーザーの確認後**）
-- [ ] 7. Render にデプロイ（[DEPLOY.md](DEPLOY.md)）→ 実機で メモリ・所要時間・日本語フォント・pygrib を確認
-- [ ] 8. GitHub の fine-grained トークンと合言葉を発行し、公開（GitHub への掲載）を実地確認
+- [x] 6. GitHub に公開リポジトリを作り push（2026-11-12）
+- [x] 7. Render にデプロイ → 実機で作図できることを確認（Dockerfile の `opts.py` コピー漏れを修正。ビルド・pygrib は問題なし）
+  - **実測（Render 無料枠）**: 作図・展開プロセスの最大メモリ **197MB**・所要時間 **72〜75秒**（GFS・断面1枚）。合計でも約240MB（本体 約36MB を足して）で、512MB に十分余裕
+- [x] 8a. `GITHUB_TOKEN`・`API_KEYS` を設定し、`/api/health` が `publish: true` になることを確認。クライアントIPは `TRUSTED_HOPS=2` で取れることを確認
+- [ ] 8b. 公開（GitHub への掲載）を実地確認（公開サイトの画面から合言葉で載せる）
 - [ ] 9. nwp_chart_web の `web/config.js` に Render の URL を入れて push（公開サイトで有効化）
 
-## 未確認・リスク（Render にデプロイするまで分からない）
+## 実機で確認する項目と結果
 | 項目 | 内容 | 外れたときの対応 |
 |---|---|---|
-| Docker ビルド | 手元に Docker が無く、Dockerfile は未実行。pygrib は PyPI の wheel（eccodes 同梱）を想定 | `libeccodes-dev` を apt で入れて pygrib をビルドする |
-| メモリ | 手元（Mac）の実測は合計347MB。Linux では値が違う | Starter（2GB・月$7）に上げる |
-| 所要時間 | GFS 約100秒・ECMWF 約120〜150秒（手元・日本からの取得）。Render（米国）からは変わる可能性 | ポーリングなので動作に支障はない |
+| Docker ビルド | **確認済み**（PyPI の wheel で pygrib が入った） | — |
+| メモリ | **確認済み**: Render で最大197MB（手元 Mac は合計347MB） | — |
+| 所要時間 | **確認済み**: Render で72〜75秒（GFS）。ECMWF は未計測 | ポーリングなので動作に支障はない |
 | 日本語フォント | Dockerfile で `fonts-ipafont-gothic` を入れる想定。図の文字が豆腐になる恐れ | フォント名（`xsection.FONTS`）を確認 |
 | クライアントIP | **確認済み（2026-11-12）**: 右端は Render 内部（10.x）→飛ばす。その左は前段の Cloudflare（104.x）→ `TRUSTED_HOPS=2` で自分のIPを採る | — |
 | 無料枠のスリープ | 約15分で停止し、再開に約50秒。画面に「起動に1分ほど」と出している | Starter で常時起動 |
