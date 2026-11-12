@@ -154,8 +154,10 @@ def render_xsection(F, init, ft, start, end, outpath, model="", name="", quantiz
         cb_label = "発散 (×1e-5 /s)"
     elif o["shade"] == "rh":
         rh = np.ma.masked_invalid(Fi["rh"])
-        cf = ax.contourf(XF, YF, np.clip(rh, 0, 99.9), levels=[60, 70, 80, 90, 100],
-                         colors=["#d9f0d3", "#a6dba0", "#5aae61", "#1b7837"], alpha=0.65, extend="neither")
+        # 湿り（60%以上）は緑、乾燥（40%以下）は黄〜橙。40〜60%は塗らない
+        cf = ax.contourf(XF, YF, np.clip(rh, 0, 99.9), levels=[0, 15, 25, 40, 60, 70, 80, 90, 100],
+                         colors=["#d99a00", "#f0c000", "#fbe98a", "#ffffff", "#d9f0d3", "#a6dba0", "#5aae61", "#1b7837"],
+                         alpha=0.65, extend="neither")
         cb_label = "相対湿度 (%)（300hPa以下）"
     elif o["shade"] == "omega":
         from matplotlib.colors import ListedColormap
@@ -211,7 +213,7 @@ def render_xsection(F, init, ft, start, end, outpath, model="", name="", quantiz
     if o["shade"] == "div":
         legend.append("色: 水平発散\n    (赤=発散, 青=収束)")
     elif o["shade"] == "rh":
-        legend.append("緑: 湿り（相対湿度）")
+        legend.append("緑: 湿り（相対湿度60%以上）\n黄: 乾燥（同40%以下）")
     elif o["shade"] == "omega":
         legend.append("色: 上昇流（ω）\n    (橙=上昇, 青=下降)")
     if o["barbs"] != "off":
