@@ -58,4 +58,4 @@
 ## 応答の形（画面との約束）
 - `GET /api/xsection`・`GET /api/emagram` → `{"state":"done","name","url":"/img/…","label","model","initText","ft","legal"}` または `202 {"state":"queued","job","position"}`。
 - `GET /api/job/<id>` → `{"state":"queued|running","job","msg","position"}`（`job` は必ず含める。画面が応答で変数を置き換えてもIDを失わないため） / `done`（上と同じ）/ `{"state":"error","error"}`。
-- 公開で書く `list.json` の項目: `kind, mk, ik, ft, label, model, initText, url("output/custom/<名前>"), ts, pub, by`。ローカルの `publish.py --custom` と同じ形式（`pub`＝公開した時刻・`by` は追加。`ts` は作図した時刻）。画面は `pub` があれば「登録」、無ければ（以前の公開分・ローカルからの公開分）`ts` を「作図」として出す。
+- 公開で書く `list.json` の項目: `kind, mk, ik, ft, label, model, initText, url("output/custom/<名前>"), ts, pub, by`。ローカルの `publish.py --custom` と同じ形式（`pub`＝公開した時刻・`by` は追加。`ts` は作図した時刻）。画面は `pub` があれば「登録」、無ければ（登録日時を記録する前の公開分）`ts` を「作図」として出す。ローカルの `publish.py --custom` も同じ形式（`ts`＝作図した時刻・`pub`＝公開した時刻）。
