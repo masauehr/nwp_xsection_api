@@ -3,7 +3,7 @@
 詳しくは [nwp-xsection-api.md](nwp-xsection-api.md) を参照。計画・進捗は [plan.md](plan.md)、設計は [DESIGN.md](DESIGN.md)、デプロイ手順は [DEPLOY.md](DEPLOY.md)。
 
 ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任意の断面線の鉛直断面図**と**任意の地点のエマグラム**を作って返す小さな API です。
-[nwp_chart_web](https://github.com/masauehr/nwp_chart_web)（数値モデル天気図ビューア）の公開サイトから呼ばれ、作った図を公開サイト（GitHub Pages）に載せる処理も代行します。
+[nwp_chart_web](https://github.com/masauehr/nwp_chart_web)（数値モデル天気図ビューア）と [tenkizu_web](https://github.com/masauehr/tenkizu_web) の公開サイトから呼ばれ、作った図を公開サイト（GitHub Pages）に載せる・外す処理も代行します（公開先はリクエストの `site` で選ぶ）。
 エマグラムは気温・露点・持ち上げ気塊・CAPE/CIN・ホドグラフ・地点の小地図つきです。
 
 - 作図は**認証なし**（回数制限あり）。公開サイトに載せるときだけ**合言葉**が要ります（GitHub への登録は不要）。
@@ -19,13 +19,15 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 | `GET /api/job/<id>` | なし | `queued` / `running`（`job`・`msg`・`position`）/ `done`（`url`・`label`・`legal` つき）/ `error`。サーバーが再起動して記録が消えていると `404`（画面は同じ条件を自動で再送する） |
 | `GET /img/<名前>.png` | なし | 作った画像（`/tmp` の短期キャッシュ。時間が経つと消える） |
 | `POST /api/publish` `{"name":"xsection_….png"}` | `Authorization: Bearer <合言葉>` | 公開サイトの `output/custom/` に載せる（直近20件） |
-| `POST /api/unpublish` `{"name":…}` | 同上 | 公開サイトから外す |
+| `POST /api/unpublish` `{"name":…}` | 同上 | 公開サイトから外す（tenkizu_web がローカルで公開した `sounding_….png` も可） |
 
 - `model`: `ecmwf` / `gfs` / `aifs`。`init`: UTC・00/06/12/18時・10日以内。`ft`: 3時間刻み（AIFS は6時間刻み・ECMWF の06/18UTC は90hまで）。
 - 断面線: 緯度 −15〜82・経度 50〜185 の中で、1〜60度。
 - 公開すると、`list.json` の項目に `ts`（作図した時刻）・`pub`（公開した時刻＝登録日時）・`by`（呼び名）が入る（時刻は UNIX 秒）。
 - `shade`（`none`/`div`/`rh`/`omega`）・`contours`（`theta,ept,wind` をカンマ区切り）・`barbs`（`off`/`back`/`front`）。省略すると従来の見た目。
 - `ptop`（断面図・エマグラム共通）: **高度設定**＝表示する高度の範囲の上端の気圧[hPa]。`100`（既定・全層）/`150`/`200`/`250`/`300`/`400`/`500`/`600`/`700`。数字が小さいほど高い所まで。省略か `100` なら従来の見た目で、画像名も従来と同じ。断面図は上端までの層だけで計算し直す（範囲内の解像度が上がる）。エマグラムは縦軸とホドグラフを上端までにする（CAPE・CIN は全層で計算するので変わらない）。選択肢以外は 400。
+- `site`（`/api/publish`・`/api/unpublish` の本文）: 公開先。省略・`nwp_chart_web` は nwp_chart_web、`tenkizu_web` は tenkizu_web。それ以外は拒否。同じ `GITHUB_TOKEN` の対象リポジトリに両方が入っている必要がある。
+- 断面図の `shade=rh`（湿り）は、相対湿度60%以上を緑、**40%以下の乾燥域を黄〜橙**で塗る（2026-11-12 追加。40〜60%は塗らない）。
 - 1つの図は1回に1〜2分かかるため、すぐ返してポーリングする方式です（Render のタイムアウト対策）。
 
 ## 環境変数
@@ -47,7 +49,7 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 ## ローカルで動かす・テスト
 ```bash
 PY=/opt/anaconda3/envs/met_env_310/bin/python
-$PY -m pytest tests                       # 111件・約17秒（ネットワーク不要。エマグラムのテストは MetPy が要る）
+$PY -m pytest tests                       # 113件・約18秒（ネットワーク不要。エマグラムのテストは MetPy が要る）
 PORT=8800 $PY app.py                      # 公開（GitHub への掲載）は GITHUB_TOKEN と API_KEYS が無いと無効（作図は使える）
 $PY tools/make_key.py tanaka              # 合言葉を作る（合言葉は相手に渡し、ハッシュの行を API_KEYS に足す）
 ```
