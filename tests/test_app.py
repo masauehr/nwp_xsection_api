@@ -154,6 +154,7 @@ def test_publish_and_unpublish(srv):
     assert code == 200 and j["names"] == [name]
     items = json.loads(srv["gh"].files["output/custom/list.json"][0])["items"]
     assert items[0]["by"] == "tanaka" and items[0]["url"] == f"output/custom/{name}" and "legal" not in items[0]
+    assert abs(items[0]["pub"] - time.time()) < 30 and items[0]["pub"] >= items[0]["ts"]      # 公開した時刻（登録日時）
     assert srv["gh"].files[f"output/custom/{name}"][0].startswith(b"\x89PNG")
     code, j, _ = jcall(srv["base"], "/api/unpublish", "POST", {"name": name}, h)
     assert code == 200 and j["names"] == []

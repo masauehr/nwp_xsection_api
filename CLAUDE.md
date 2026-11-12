@@ -19,7 +19,7 @@
 - `/api/publish`・`/api/unpublish` は合言葉つき・間違いが続いたら一定時間拒否・Origin を許可リストで確認（外さない）。作図 API は認証なしだが、**回数制限・検証（`engine.validate`）・待ち行列の上限を外さない**。
 - 想定外の例外の詳細は画面に返さない（ログだけ）。入力・データの問題（`CustomError`）のメッセージだけを返す。
 - 出典・ライセンス・免責の表示（`nwp_data.legal_short`）を外さない（ECMWF CC BY 4.0・NOAA の要請）。応答の `legal` を画面に出している。
-- GitHub への書き込みは対象リポジトリの `output/custom/` の画像と `list.json` だけ（`ghpub.py`）。画面ファイルやモデルの画像には触れない。形式は nwp_chart_web の `publish.py --custom` と同じにする（`list.json` の項目: kind・mk・ik・ft・label・model・initText・url・ts。`by` は追加項目）。
+- GitHub への書き込みは対象リポジトリの `output/custom/` の画像と `list.json` だけ（`ghpub.py`）。画面ファイルやモデルの画像には触れない。形式は nwp_chart_web の `publish.py --custom` と同じにする（`list.json` の項目: kind・mk・ik・ft・label・model・initText・url・ts。`pub`（公開した時刻）・`by` は追加項目）。
 
 ## 落とし穴
 - **pygrib の切り出しは必ずコピーする**（`np.array(…)`）。ビューのままだと切り出し前の全球配列が残り、メモリが約300MB増える。

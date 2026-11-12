@@ -308,7 +308,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(410, {"error": "画像が残っていません（時間が経つと消えます）。もう一度作図してから公開してください"})
                     return
                 item = {k: meta[k] for k in ("kind", "mk", "ik", "ft", "label", "model", "initText") if k in meta}
-                item.update(url=f"{PUBLISH_DIR}/{name}", ts=meta.get("created", time.time()), by=who)
+                item.update(url=f"{PUBLISH_DIR}/{name}", ts=meta.get("created", time.time()), pub=time.time(), by=who)   # ts=作図した時刻・pub=公開した時刻
                 names = ghpub.publish(self.gh, PUBLISH_DIR, name, png, item)
                 log("公開", name, "by", who)
         except ghpub.GitHubError as e:

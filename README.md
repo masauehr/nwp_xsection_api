@@ -21,6 +21,7 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 
 - `model`: `ecmwf` / `gfs` / `aifs`。`init`: UTC・00/06/12/18時・10日以内。`ft`: 3時間刻み（AIFS は6時間刻み・ECMWF の06/18UTC は90hまで）。
 - 断面線: 緯度 −15〜82・経度 50〜185 の中で、1〜60度。
+- 公開すると、`list.json` の項目に `ts`（作図した時刻）・`pub`（公開した時刻＝登録日時）・`by`（呼び名）が入る（時刻は UNIX 秒）。
 - `shade`（`none`/`div`/`rh`/`omega`）・`contours`（`theta,ept,wind` をカンマ区切り）・`barbs`（`off`/`back`/`front`）。省略すると従来の見た目。
 - 1つの図は1回に1〜2分かかるため、すぐ返してポーリングする方式です（Render のタイムアウト対策）。
 
