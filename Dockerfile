@@ -17,7 +17,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py auth.py engine.py ghpub.py limits.py nwp_data.py xsection.py ./
+COPY app.py auth.py engine.py ghpub.py limits.py nwp_data.py opts.py xsection.py ./
 COPY assets ./assets
 
 # 一般ユーザーで動かす（root では動かさない）
