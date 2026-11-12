@@ -13,6 +13,7 @@
 作図は1件ずつ（待ち行列に最大 QUEUE_MAX 件）。1回に1〜2分かかるため、すぐ返してポーリングさせる（Render のタイムアウト対策）。
 設定は環境変数（README.md の表）。秘密（GITHUB_TOKEN・API_KEYS）はリポジトリに入れない。
 """
+import ipaddress
 import json
 import os
 import queue
@@ -32,7 +33,8 @@ from limits import SlidingWindow
 QUEUE_MAX = int(os.environ.get("QUEUE_MAX", "3"))                      # 待ち行列（実行中を除く）の最大件数
 RENDER_PER_HOUR = int(os.environ.get("RENDER_PER_HOUR", "8"))          # 1つのIPが1時間に新しく作図できる回数（キャッシュに当たる分は数えない）
 GLOBAL_PER_HOUR = int(os.environ.get("GLOBAL_PER_HOUR", "60"))         # 全体で1時間に新しく作図できる回数
-TRUSTED_HOPS = int(os.environ.get("TRUSTED_HOPS", "1"))                # X-Forwarded-For の右から何番目を相手のIPとみなすか（Render は1）
+TRUSTED_HOPS = int(os.environ.get("TRUSTED_HOPS", "1"))                # X-Forwarded-For の右から（内部アドレスを除いて）何番目の公開アドレスを相手のIPとみなすか
+DEBUG_IP = os.environ.get("DEBUG_IP") == "1"                           # 1 のとき /api/health に受け取った X-Forwarded-For を出す（診断用。確認後は外す）
 ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.environ.get(
     "ALLOWED_ORIGINS", "https://masauehr.github.io,http://127.0.0.1:8790,http://localhost:8790").split(",") if o.strip()}
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "masauehr/nwp_chart_web")
@@ -117,12 +119,22 @@ class Jobs:
             job["finished"] = time.time()
 
 
+def _is_public(addr):
+    """公開されているアドレスか（10.x・192.168.x・127.x などプロキシ内部のものは False）。"""
+    try:
+        a = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return not (a.is_private or a.is_loopback or a.is_link_local or a.is_unspecified or a.is_reserved)
+
+
 def client_ip(xff, peer, hops=TRUSTED_HOPS):
-    """相手のIP。プロキシ（Render）が付けた X-Forwarded-For の右から hops 番目を使う（左側は相手が偽装できる）。"""
+    """相手のIP。プロキシが付けた X-Forwarded-For を右から見て、プライベートアドレス（Render 内部のプロキシ）を飛ばし、
+    公開アドレスを hops 番目に採る（左側は相手が偽装できるので使わない）。見つからなければ接続元。"""
     if xff:
-        parts = [x.strip() for x in xff.split(",") if x.strip()]
-        if len(parts) >= hops:
-            return parts[-hops]
+        pub = [x.strip() for x in xff.split(",") if _is_public(x.strip())]
+        if len(pub) >= hops:
+            return pub[-hops]
     return peer
 
 
@@ -177,7 +189,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         if u.path == "/api/health" or u.path == "/":
-            self._json(200, {"ok": True, "ip": self._ip(), "publish": self.gh is not None and bool(self.keys)})
+            body = {"ok": True, "ip": self._ip(), "publish": self.gh is not None and bool(self.keys)}
+            if DEBUG_IP:
+                body["debug"] = {"xff": self.headers.get("X-Forwarded-For"), "peer": self.client_address[0]}
+            self._json(200, body)
         elif u.path == "/api/xsection":
             self._xsection({k: v[0] for k, v in parse_qs(u.query).items()})
         elif u.path.startswith("/api/job/"):
