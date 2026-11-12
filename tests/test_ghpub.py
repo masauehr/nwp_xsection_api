@@ -58,12 +58,14 @@ def test_publish_adds_image_and_list():
     assert items_of(gh)[0]["by"] == "tanaka" and items_of(gh)[0]["url"] == f"{DIR}/{name(1)}"
 
 
-def test_newest_first_and_max_10_with_sweep():
+def test_newest_first_and_max_with_sweep():
     gh = FakeGH()
-    for i in range(12):
+    n = ghpub.MAX_ITEMS
+    assert n == 20
+    for i in range(n + 2):
         ghpub.publish(gh, DIR, name(i), b"p", item(i))
     names = [x["url"].rsplit("/", 1)[1] for x in items_of(gh)]
-    assert names == [name(i) for i in range(11, 1, -1)]                       # 新しい順・10件
+    assert names == [name(i) for i in range(n + 1, 1, -1)]                    # 新しい順・上限の件数
     assert sorted(p.rsplit("/", 1)[1] for p in gh.files if p.endswith(".png")) == sorted(names)   # 外れた画像は公開側からも消える
 
 

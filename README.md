@@ -18,7 +18,7 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 | `GET /api/emagram?model=gfs&init=YYYYMMDDHH&ft=12&lat=26.2&lon=127.7` | なし | エマグラム。受付・応答は断面図と同じ（`202`→ジョブ→画像）。地点は緯度 −15〜82・経度 50〜185 の中 |
 | `GET /api/job/<id>` | なし | `queued` / `running` / `done`（`url`・`label`・`legal` つき）/ `error` |
 | `GET /img/<名前>.png` | なし | 作った画像（`/tmp` の短期キャッシュ。時間が経つと消える） |
-| `POST /api/publish` `{"name":"xsection_….png"}` | `Authorization: Bearer <合言葉>` | 公開サイトの `output/custom/` に載せる（直近10件） |
+| `POST /api/publish` `{"name":"xsection_….png"}` | `Authorization: Bearer <合言葉>` | 公開サイトの `output/custom/` に載せる（直近20件） |
 | `POST /api/unpublish` `{"name":…}` | 同上 | 公開サイトから外す |
 
 - `model`: `ecmwf` / `gfs` / `aifs`。`init`: UTC・00/06/12/18時・10日以内。`ft`: 3時間刻み（AIFS は6時間刻み・ECMWF の06/18UTC は90hまで）。

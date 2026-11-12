@@ -2,7 +2,7 @@
 # coding: utf-8
 """作図した画像を、公開サイト（nwp_chart_web の gh-pages ブランチの output/custom/）に載せる／外す。
 
-GitHub の Contents API で、画像と list.json（新しい順・最大10件）だけを書き換える。リポジトリは clone しない（Render の軽量環境向け）。
+GitHub の Contents API で、画像と list.json（新しい順・最大20件）だけを書き換える。リポジトリは clone しない（Render の軽量環境向け）。
 nwp_chart_web の publish.py --custom と同じ形式の list.json を書く。publish.py は定期的に孤立コミットで作り直すので、
 この方法で増えたコミットも履歴に残らない。トークンは対象リポジトリの Contents 書き込み権限だけの fine-grained トークンにする。
 """
@@ -14,7 +14,7 @@ from pathlib import PurePosixPath
 
 import requests
 
-MAX_ITEMS = 10          # 公開サイトに載せる最大件数（publish.py の CUSTOM_MAX と同じ）
+MAX_ITEMS = 20          # 公開サイトに載せる最大件数（nwp_chart_web の publish.py の CUSTOM_MAX と同じにする）
 NAME_RE = re.compile(r"(?:xsection|emagram)_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
 
 
