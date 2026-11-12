@@ -7,11 +7,27 @@
 SHADES = {"none": "なし", "div": "発散", "rh": "湿り（相対湿度）", "omega": "上昇流（ω）"}   # 色塗り。1つだけ選ぶ
 CONTOURS = {"theta": "温位", "ept": "相当温位", "wind": "断面平行風"}                          # 等値線。複数選べる
 BARBS = {"off": "なし", "back": "背景（薄い灰色）", "front": "前面（黒）"}                      # 風矢羽
-DEFAULT_OPTS = {"shade": "div", "contours": ("theta", "ept", "wind"), "barbs": "front"}
+# 高度設定: 表示する高度の範囲の上端の気圧[hPa]（小さいほど高い所まで）。既定は 100hPa（全層・従来の見た目）
+PTOPS = (100, 150, 200, 250, 300, 400, 500, 600, 700)
+DEFAULT_PTOP = 100
+DEFAULT_OPTS = {"shade": "div", "contours": ("theta", "ept", "wind"), "barbs": "front", "ptop": DEFAULT_PTOP}
+
+
+def parse_ptop(v):
+    """高度設定（上端の気圧[hPa]）を検証して整数で返す。未指定は既定（100）。選択肢以外は ValueError。"""
+    if v is None or v == "":
+        return DEFAULT_PTOP
+    try:
+        x = int(float(v))
+    except (TypeError, ValueError):
+        raise ValueError("高度（上端の気圧）が数値ではありません")
+    if x not in PTOPS:
+        raise ValueError("高度（上端の気圧）は " + "・".join(str(t) for t in PTOPS) + " hPa のどれかです")
+    return x
 
 
 def normalize_opts(opts=None):
-    """表示要素の指定を検証して、揃った形（shade・contours・barbs）にする。不正な値は ValueError。"""
+    """表示要素の指定を検証して、揃った形（shade・contours・barbs・ptop）にする。不正な値は ValueError。"""
     o = dict(DEFAULT_OPTS)
     o.update({k: v for k, v in (opts or {}).items() if v is not None})
     if o["shade"] not in SHADES:
@@ -23,6 +39,7 @@ def normalize_opts(opts=None):
     if bad:
         raise ValueError(f"等値線の指定が不正です: {bad[0]}")
     o["contours"] = tuple(c for c in CONTOURS if c in cs)       # 並びを固定（同じ指定は同じ画像・同じ名前になる）
+    o["ptop"] = parse_ptop(o["ptop"])
     return o
 
 
@@ -33,4 +50,6 @@ def options_text(opts=None):
     if o["shade"] != "none":
         parts.append(SHADES[o["shade"]])
     parts.append("風矢羽:" + BARBS[o["barbs"]] if o["barbs"] != "off" else "風矢羽なし")
+    if o["ptop"] != DEFAULT_PTOP:
+        parts.append(f"上端{o['ptop']}hPa")
     return "／".join(parts)

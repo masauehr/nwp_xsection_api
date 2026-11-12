@@ -230,3 +230,14 @@ def test_job_status_keeps_job_id(srv):
     code, s2, _ = jcall(srv["base"], f"/api/job/{s['job']}")           # 応答の job で、もう一度確認できる
     assert code == 200
     wait_done(srv["base"], j["job"])
+
+
+def test_ptop_is_passed_through_and_validated(srv):
+    """高度設定（ptop）は作図に渡る。選択肢以外は400。"""
+    base = f"model=gfs&init={init_str()}&ft=12"
+    code, j, _ = jcall(srv["base"], f"/api/emagram?{base}&lat=26.2&lon=127.7&ptop=300")
+    assert code == 202
+    wait_done(srv["base"], j["job"])
+    assert srv["calls"][-1]["ptop"] == 300
+    code, j2, _ = jcall(srv["base"], f"/api/xsection?{base}&lat1=45&lon1=130&lat2=25&lon2=130&ptop=50")
+    assert code == 400 and "高度" in j2["error"]

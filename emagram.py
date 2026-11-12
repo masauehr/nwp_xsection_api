@@ -92,7 +92,7 @@ def map_extent(lat, lon, dlon=12.0, dlat=8.0):
     return (lon - dlon, lon + dlon, max(-90.0, lat - dlat), min(90.0, lat + dlat))
 
 
-def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=True):
+def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=True, ptop=100):
     """エマグラムを1枚描画して outpath へ保存する。"""
     from metpy.plots import Hodograph, SkewT
     from metpy.units import units
@@ -105,7 +105,7 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
     fig.subplots_adjust(top=0.90, bottom=0.115, left=0.09, right=0.78)   # 右に地点の地図を置く
     skew = SkewT(fig, rotation=0, aspect=120)
     skew.ax.set_xlim(-70, 40)
-    skew.ax.set_ylim(1000, 100)
+    skew.ax.set_ylim(1000, ptop)                 # 高度設定: 表示する範囲の上端（CAPE・CIN は全層の気塊で計算するので変わらない）
     skew.ax.set_xlabel("Temperature (°C)")
     skew.ax.set_ylabel("Pressure (hPa)")
     p, T = fine["p"] * units.hPa, fine["T"] * units.degC
@@ -136,7 +136,10 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
     ia = inset_axes(skew.ax, "34%", "34%", loc=1)
     hod = Hodograph(ia, component_range=80.0)
     hod.add_grid(increment=20)
-    hod.plot_colormapped(prof["u"] * units("m/s"), prof["v"] * units("m/s"), prof["h"] * units.m)
+    hm = prof["p"] >= ptop                        # ホドグラフも表示する高度の範囲まで（2点未満なら全層）
+    if hm.sum() < 2:
+        hm = np.ones_like(hm, dtype=bool)
+    hod.plot_colormapped(prof["u"][hm] * units("m/s"), prof["v"][hm] * units("m/s"), prof["h"][hm] * units.m)
 
     skew.ax.text(0.02, 0.02,
                  f"Parcel start: {fine['p'][dg['i0']]:.0f} hPa\nLCL: {dg['lcl_p'].magnitude:.0f} hPa\n"
@@ -167,7 +170,7 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
     fig.text(0.985, 0.955, f"{valid:%m/%d %H}UTC", fontsize=13, family="serif", color="#5a3410",
              va="center", ha="right")
     fig.text(0.09, 0.915, f"要求 {lat:.2f}N {lon:.2f}E / 格子 {prof['grid_lat']:.2f}N {prof['grid_lon']:.2f}E"
-             f"（地表気圧 {prof['sp']:.0f}hPa）", fontsize=8, family=FONTS, va="center")
+             f"（地表気圧 {prof['sp']:.0f}hPa）" + (f"／表示 〜{ptop}hPa" if ptop != 100 else ""), fontsize=8, family=FONTS, va="center")
     fig.text(0.006, 0.012, f"{model} INIT:{init:%m/%d %H:%M}(UTC)".strip(), fontsize=9, va="bottom")
     _caption(fig, [(f"{init:%d%H}", "#1010e0", 16), (f"<{ft}>", "#d020d0", 16),
                       ("Emagram", "#7a5a30", 16)], y=0.045, fw=W)

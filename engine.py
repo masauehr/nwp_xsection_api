@@ -69,7 +69,13 @@ def validate(model, init_s, ft, q, now=None, kind="xsection"):
     ft = int(_num(ft, "予報時間", 0, 360))
     if not nwp_data.step_ok(model, init, ft):
         raise CustomError(f"{nwp_data.MODELS[model]['label']} {init_s} には予報時間 {ft}h がありません（3時間刻み・AIFSは6時間刻み・ECMWFの06/18UTCは90hまで）")
+    try:
+        ptop = opts.parse_ptop(q.get("ptop"))      # 高度設定（表示する高度の範囲の上端）
+    except ValueError as e:
+        raise CustomError(str(e))
     p = dict(kind=kind, model=model, init=init_s, ft=ft)
+    if ptop != opts.DEFAULT_PTOP:                  # 既定のときは p に入れない（画像名が従来と同じになる）
+        p["ptop"] = ptop
     c = nwp_data.CROP        # データを読む範囲の中に限る
     if kind == "emagram":
         p.update(lat=_num(q.get("lat"), "緯度", c["lat0"], c["lat1"]), lon=_num(q.get("lon"), "経度", c["lon0"], c["lon1"]))
@@ -85,7 +91,7 @@ def validate(model, init_s, ft, q, now=None, kind="xsection"):
     raw = q.get("contours")
     try:
         o = opts.normalize_opts(dict(shade=q.get("shade") or None, barbs=q.get("barbs") or None,
-                                         contours=None if raw is None else [c for c in raw.split(",") if c]))
+                                         contours=None if raw is None else [c for c in raw.split(",") if c], ptop=ptop))
     except ValueError as e:
         raise CustomError(str(e))
     p.update(shade=o["shade"], contours=",".join(o["contours"]), barbs=o["barbs"])
@@ -104,14 +110,14 @@ def out_path(p):
 
 
 def opts_of(p):
-    return dict(shade=p.get("shade"), barbs=p.get("barbs"),
+    return dict(shade=p.get("shade"), barbs=p.get("barbs"), ptop=p.get("ptop"),
                 contours=None if p.get("contours") is None else [c for c in p["contours"].split(",") if c])
 
 
 def describe(p):
     """画面に出す名前（断面線＋表示要素、またはエマグラムの地点）。"""
     if p["kind"] == "emagram":
-        return f"エマグラム ({p['lat']:g}N,{p['lon']:g}E)"
+        return f"エマグラム ({p['lat']:g}N,{p['lon']:g}E)" + (f" ｜ 上端{p['ptop']}hPa" if "ptop" in p else "")
     base = f"断面 ({p['lat1']:g}N,{p['lon1']:g}E)→({p['lat2']:g}N,{p['lon2']:g}E)"
     return base + " ｜ " + opts.options_text(opts_of(p))
 
@@ -228,7 +234,8 @@ def render(p):
         if p["kind"] == "emagram":
             import emagram
             try:
-                emagram.render_emagram(F, init, p["ft"], p["lat"], p["lon"], str(tmp), model=label)
+                emagram.render_emagram(F, init, p["ft"], p["lat"], p["lon"], str(tmp), model=label,
+                                       ptop=p.get("ptop", opts.DEFAULT_PTOP))
             except ValueError as e:
                 raise CustomError(str(e))
         else:

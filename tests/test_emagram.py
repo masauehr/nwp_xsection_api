@@ -89,3 +89,28 @@ def test_emagram_renders(tmp_path):
     r = emagram.render_emagram(synthetic_F(), datetime(2026, 11, 10, 18), 12, 35.7, 139.7, str(out), model="TEST")
     assert out.exists() and out.stat().st_size > 20_000
     assert np.isfinite(r["cape"]) and np.isfinite(r["cin"])
+
+
+@pytest.mark.parametrize("ptop", [200, 300, 500])
+def test_emagram_renders_with_ptop(tmp_path, ptop):
+    """高度設定: 縦軸とホドグラフを上端までにしても描ける。CAPE・CIN は全層で計算するので、上端に左右されない。"""
+    out = tmp_path / "em.png"
+    r = emagram.render_emagram(synthetic_F(), datetime(2026, 11, 10, 18), 12, 35.7, 139.7, str(out), model="TEST", ptop=ptop)
+    full = emagram.render_emagram(synthetic_F(), datetime(2026, 11, 10, 18), 12, 35.7, 139.7, str(tmp_path / "full.png"), model="TEST")
+    assert out.exists() and out.stat().st_size > 20_000
+    assert r["cape"] == pytest.approx(full["cape"]) and r["cin"] == pytest.approx(full["cin"])
+
+
+def test_validate_ptop_for_both_kinds():
+    q = dict(lat="35.7", lon="139.7", lat1="45", lon1="130", lat2="25", lon2="130")
+    for kind in ("emagram", "xsection"):
+        d = engine.validate("gfs", "2026111100", "12", q, now=NOW, kind=kind)
+        c = engine.validate("gfs", "2026111100", "12", {**q, "ptop": "300"}, now=NOW, kind=kind)
+        assert "ptop" not in d and c["ptop"] == 300                                   # 既定は p に入れない（画像名が従来と同じ）
+        assert engine.image_name(d) != engine.image_name(c)
+        assert "上端300hPa" in engine.describe(c) and "上端" not in engine.describe(d)
+        for bad in ("50", "abc", "1000"):
+            with pytest.raises(engine.CustomError):
+                engine.validate("gfs", "2026111100", "12", {**q, "ptop": bad}, now=NOW, kind=kind)
+    same = engine.validate("gfs", "2026111100", "12", {**q, "ptop": "100"}, now=NOW, kind="emagram")
+    assert engine.image_name(same) == engine.image_name(engine.validate("gfs", "2026111100", "12", q, now=NOW, kind="emagram"))

@@ -24,7 +24,7 @@ from scipy.ndimage import map_coordinates, gaussian_filter, gaussian_filter1d
 R_EARTH = 6.371e6
 
 from plotutil import DPI, FONTS, KT, _caption, _coast_lines, _quantize_png   # noqa: F401  共有の描画補助
-from opts import BARBS, CONTOURS, DEFAULT_OPTS, SHADES, normalize_opts, options_text   # noqa: F401  表示要素の指定（軽いモジュール）
+from opts import BARBS, CONTOURS, DEFAULT_OPTS, DEFAULT_PTOP, PTOPS, SHADES, normalize_opts, options_text, parse_ptop   # noqa: F401  表示要素の指定（軽いモジュール）
 
 
 def _dewpoint(t_c, rh):
@@ -71,11 +71,13 @@ def _sample(arr, lats, lons, plat, plon):
     return map_coordinates(np.asarray(arr, dtype=float), [yi, xi], order=1, mode="nearest")
 
 
-def compute_section(F, start, end):
+def compute_section(F, start, end, ptop=DEFAULT_PTOP):
     """断面上の各量を返す。levels は下（大きい気圧）から上へ並べる。"""
     lats, lons = F["lats"], F["lons"]
     plat, plon = path_points(start, end)
-    levels = sorted(F["p"], reverse=True)
+    levels = sorted([lv for lv in F["p"] if lv >= ptop], reverse=True)       # 高度設定: 上端までの層だけで計算する（範囲内の解像度が上がる）
+    if len(levels) < 2:
+        raise ValueError(f"上端 {ptop}hPa までの気圧面が2層未満です")
     # 経路の向き（東・北成分の単位ベクトル）。断面平行・垂直の風の分解に使う
     dlat, dlon = end[0] - start[0], end[1] - start[1]
     ex, ey = dlon * np.cos(np.deg2rad(plat.mean())), dlat
@@ -133,7 +135,7 @@ def render_xsection(F, init, ft, start, end, outpath, model="", name="", quantiz
     """断面図を1枚描画して outpath へ保存する。start/end は (緯度, 経度)。wind: uv=風矢羽(UV) / tn=断面平行・垂直。
     opts: 表示要素（shade=色塗り・contours=等値線・barbs=風矢羽。normalize_opts を参照。省略すると従来の見た目）。"""
     o = normalize_opts(opts)
-    S = compute_section(F, start, end)
+    S = compute_section(F, start, end, o["ptop"])
     x = S["plat"] if S["ax"] == "lat" else S["plon"]
     lev = S["levels"]
     W, H = 9.5, 7.6

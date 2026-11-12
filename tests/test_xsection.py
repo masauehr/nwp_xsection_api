@@ -19,7 +19,7 @@ def synthetic_F():
 
 
 def test_defaults_keep_the_original_look():
-    assert xs.normalize_opts() == {"shade": "div", "contours": ("theta", "ept", "wind"), "barbs": "front"}
+    assert xs.normalize_opts() == {"shade": "div", "contours": ("theta", "ept", "wind"), "barbs": "front", "ptop": 100}
 
 
 def test_normalize_orders_contours_and_validates():
@@ -81,3 +81,32 @@ def test_coast_lines_do_not_wrap_around_the_map():
     lines = xs._coast_lines()
     assert lines, "assets/coast.json が読めていません"
     assert max(np.abs(np.diff(lon)).max() for lon, _ in lines if len(lon) > 1) <= 180.0
+
+
+def test_parse_ptop():
+    """高度設定（上端の気圧）: 未指定は100、選択肢以外は拒否する。"""
+    assert xs.parse_ptop(None) == 100 and xs.parse_ptop("") == 100 and xs.parse_ptop("300") == 300 and xs.parse_ptop(500.0) == 500
+    for bad in ("abc", "50", "1000", "250.5x", "-100", "nan"):
+        with pytest.raises(ValueError):
+            xs.parse_ptop(bad)
+    assert xs.options_text({"ptop": 100}) == xs.options_text()                       # 既定なら説明は増えない
+    assert xs.options_text({"ptop": 300}).endswith("／上端300hPa")
+
+
+@pytest.mark.parametrize("ptop", [200, 300, 500, 700])
+def test_section_is_limited_to_ptop(tmp_path, ptop):
+    """上端までの層だけで計算し、縦軸も上端まで。描画も通る。"""
+    S = xs.compute_section(synthetic_F(), (45.0, 130.0), (25.0, 130.0), ptop)
+    assert S["levels"].min() == ptop and S["levels"].max() == 1000.0
+    assert S["fine"]["levels"].min() == pytest.approx(ptop)                           # 細かい層も上端まで（範囲内の解像度が上がる）
+    out = tmp_path / "xs.png"
+    xs.render_xsection(synthetic_F(), datetime(2026, 11, 10, 18), 12, (45.0, 130.0), (25.0, 130.0), str(out),
+                       model="TEST", opts=dict(ptop=ptop, shade="rh"))
+    assert out.exists() and out.stat().st_size > 10_000
+
+
+def test_section_needs_two_levels():
+    F = synthetic_F()
+    F["p"] = {k: v for k, v in F["p"].items() if k in (1000, 100)}
+    with pytest.raises(ValueError):
+        xs.compute_section(F, (45.0, 130.0), (25.0, 130.0), 500)                      # 500hPa 以下の層が1つしかない
