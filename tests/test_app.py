@@ -42,10 +42,11 @@ def srv(tmp_path, monkeypatch):
     app.Handler.jobs = app.Jobs(render_fn=fake_render)
     app.Handler.keys = auth.parse_keys(f"tanaka:{auth.hash_key(KEY)}")
     app.Handler.gh = FakeGH()
+    app.Handler.gh_sites = {"tenkizu_web": FakeGH()}
     server = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield dict(base=f"http://127.0.0.1:{server.server_address[1]}", calls=calls, gh=app.Handler.gh)
+    yield dict(base=f"http://127.0.0.1:{server.server_address[1]}", calls=calls, gh=app.Handler.gh, gh2=app.Handler.gh_sites["tenkizu_web"])
     server.shutdown()
 
 
@@ -241,3 +242,24 @@ def test_ptop_is_passed_through_and_validated(srv):
     assert srv["calls"][-1]["ptop"] == 300
     code, j2, _ = jcall(srv["base"], f"/api/xsection?{base}&lat1=45&lon1=130&lat2=25&lon2=130&ptop=50")
     assert code == 400 and "高度" in j2["error"]
+
+
+def test_publish_site_selects_repo(srv):
+    """site=tenkizu_web なら、tenkizu_web の公開先へ載せる・外す。既定（nwp_chart_web）には触れない。未知の site は拒否。"""
+    name = make_image(srv)
+    h = {"Authorization": f"Bearer {KEY}", "Origin": ORIGIN}
+    code, j, _ = jcall(srv["base"], "/api/publish", "POST", {"name": name, "site": "tenkizu_web"}, h)
+    assert code == 200 and j["site"].endswith("/tenkizu_web/")
+    assert f"output/custom/{name}" in srv["gh2"].files and not srv["gh"].files
+    code, j, _ = jcall(srv["base"], "/api/unpublish", "POST", {"name": name, "site": "tenkizu_web"}, h)
+    assert code == 200 and j["names"] == []
+    assert jcall(srv["base"], "/api/publish", "POST", {"name": name, "site": "other_repo"}, h)[0] == 400
+
+
+def test_unpublish_accepts_sounding_name_but_publish_does_not(srv):
+    """tenkizu_web がローカルで公開した実況エマグラム（sounding_…）は、外す操作の対象にできる。載せる操作は API が作った図だけ。"""
+    h = {"Authorization": f"Bearer {KEY}", "Origin": ORIGIN}
+    n = "sounding_2026111112_47918_pt.png"
+    assert jcall(srv["base"], "/api/unpublish", "POST", {"name": n, "site": "tenkizu_web"}, h)[0] == 200
+    assert jcall(srv["base"], "/api/publish", "POST", {"name": n, "site": "tenkizu_web"}, h)[0] == 400
+

@@ -33,6 +33,7 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 |---|---|---|
 | `PORT` | 8800 | 待ち受けポート（Render が設定する） |
 | `ALLOWED_ORIGINS` | `https://masauehr.github.io`＋ローカル | ブラウザからの呼び出しを許可するサイト（カンマ区切り） |
+| `GITHUB_REPO_TENKIZU_WEB` | `masauehr/tenkizu_web` | 2つ目の公開先（リクエストの `site=tenkizu_web`）。同じトークンで書く |
 | `GITHUB_TOKEN` | なし | 公開用。対象リポジトリの Contents 書き込み権限だけの fine-grained トークン（**秘密**） |
 | `API_KEYS` | なし | 公開用の合言葉。`呼び名:SHA-256` のカンマ区切り（`tools/make_key.py` で作る・**秘密**） |
 | `GITHUB_REPO` / `GITHUB_BRANCH` / `PUBLISH_DIR` | `masauehr/nwp_chart_web` / `gh-pages` / `output/custom` | 公開先 |

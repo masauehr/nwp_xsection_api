@@ -42,6 +42,9 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO", "masauehr/nwp_chart_web")
 GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "gh-pages")
 PUBLISH_DIR = os.environ.get("PUBLISH_DIR", "output/custom")
 PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "https://masauehr.github.io/nwp_chart_web/")
+# 公開先のサイト。リクエストの site（既定 nwp_chart_web）で選ぶ。nwp_chart_web 以外は、ここに挙げたものだけ許す（任意のリポジトリには書かない）。
+# 同じトークンで書けるよう、トークンの対象リポジトリにも入れておく（fine-grained トークンの Repository access）
+EXTRA_SITES = {"tenkizu_web": os.environ.get("GITHUB_REPO_TENKIZU_WEB", "masauehr/tenkizu_web")}
 JOB_KEEP_SEC = 3600
 
 _render_ip = SlidingWindow(RENDER_PER_HOUR, 3600)
@@ -144,7 +147,8 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "nwp-xsection-api"
     jobs: Jobs = None
     keys: dict = {}
-    gh = None
+    gh = None                # 公開先 nwp_chart_web（既定）
+    gh_sites: dict = None    # それ以外の公開先（site 名 → GitHub）
 
     # ---------- 共通
     def _origin_ok(self):
@@ -293,13 +297,20 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError):
             body = {}
         name = body.get("name") if isinstance(body, dict) else None
-        if not isinstance(name, str) or not engine.NAME_RE.fullmatch(name):
+        site = (body.get("site") if isinstance(body, dict) else None) or "nwp_chart_web"
+        gh = self.gh if site == "nwp_chart_web" else (self.gh_sites or {}).get(site)
+        if gh is None:
+            self._json(400, {"error": "公開先の指定が不正です"})
+            return
+        # 外す操作は、tenkizu_web がローカルで公開した実況エマグラム（sounding_…）も対象にする。載せる操作は、この API が作った図だけ
+        ok_name = ghpub.NAME_RE if path == "/api/unpublish" else engine.NAME_RE
+        if not isinstance(name, str) or not ok_name.fullmatch(name):
             self._json(400, {"error": "画像の指定が不正です"})
             return
         try:
             if path == "/api/unpublish":
-                names = ghpub.unpublish(self.gh, PUBLISH_DIR, name)
-                log("公開から外す", name, "by", who)
+                names = ghpub.unpublish(gh, PUBLISH_DIR, name)
+                log("公開から外す", site, name, "by", who)
             else:
                 meta = engine.read_meta(name)
                 try:
@@ -311,18 +322,25 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 item = {k: meta[k] for k in ("kind", "mk", "ik", "ft", "label", "model", "initText") if k in meta}
                 item.update(url=f"{PUBLISH_DIR}/{name}", ts=meta.get("created", time.time()), pub=time.time(), by=who)   # ts=作図した時刻・pub=公開した時刻
-                names = ghpub.publish(self.gh, PUBLISH_DIR, name, png, item)
-                log("公開", name, "by", who)
+                names = ghpub.publish(gh, PUBLISH_DIR, name, png, item)
+                log("公開", site, name, "by", who)
         except ghpub.GitHubError as e:
             log("公開に失敗", repr(e))
             self._json(502, {"error": f"公開サイトへの反映に失敗しました: {e}"})
             return
-        self._json(200, {"ok": True, "names": names, "site": PUBLIC_SITE_URL})
+        self._json(200, {"ok": True, "names": names,
+                         "site": PUBLIC_SITE_URL if site == "nwp_chart_web" else f"https://masauehr.github.io/{site}/"})
 
 
 def make_gh():
     token = os.environ.get("GITHUB_TOKEN")
     return ghpub.GitHub(token, GITHUB_REPO, GITHUB_BRANCH) if token else None
+
+
+def make_gh_sites():
+    """nwp_chart_web 以外の公開先（EXTRA_SITES）。同じトークンを使う。"""
+    token = os.environ.get("GITHUB_TOKEN")
+    return {k: ghpub.GitHub(token, repo, GITHUB_BRANCH) for k, repo in EXTRA_SITES.items()} if token else {}
 
 
 def main():
@@ -331,6 +349,7 @@ def main():
     Handler.jobs = Jobs()
     Handler.keys = auth.parse_keys(os.environ.get("API_KEYS", ""))
     Handler.gh = make_gh()
+    Handler.gh_sites = make_gh_sites()
     if Handler.gh is None or not Handler.keys:
         log("注意: GITHUB_TOKEN か API_KEYS が未設定のため、公開（GitHubへの掲載）は無効です")
     srv = ThreadingHTTPServer((host, port), Handler)

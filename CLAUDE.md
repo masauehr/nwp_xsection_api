@@ -22,6 +22,7 @@
 - GitHub への書き込みは対象リポジトリの `output/custom/` の画像と `list.json` だけ（`ghpub.py`）。画面ファイルやモデルの画像には触れない。形式は nwp_chart_web の `publish.py --custom` と同じにする（`list.json` の項目: kind・mk・ik・ft・label・model・initText・url・ts。`pub`（公開した時刻）・`by` は追加項目）。
 
 ## 落とし穴
+- **公開先は `site`（既定 nwp_chart_web・許可は `tenkizu_web` だけ。任意のリポジトリには書かない）**。`GITHUB_TOKEN` の対象リポジトリに両方を入れる。外す操作は `ghpub.NAME_RE`（`sounding_…` も可）、載せる操作は API が作った図（`engine.NAME_RE`）だけ。上限20件は nwp_chart_web・tenkizu_web の `publish.py` の `CUSTOM_MAX` と同じ。
 - 高度設定 `ptop`（表示する高度の範囲の上端[hPa]・選択肢は `opts.PTOPS`）は、**既定（100）のときは条件 `p` に入れない**（画像名・キャッシュが従来と同じ）。断面図は `compute_section(ptop)` で上端までの層だけを使い、エマグラムは縦軸とホドグラフだけを上端までにする（CAPE・CIN は全層）。ローカルの nwp_chart_web（`xsection.py`・`emagram.py`・`custom.py`）にも同じ仕組みを入れてある（別々のコピー。直すときは両方）。
 - **公開用 GitHub トークンの期限通知**（`ops/token_expiry_notify.py`・launchd・`~/.config/nwp_xsection_api/`）は、nwp_chart_web の `ops/token_expiry_notify.py` のコピー（共通部品化しない）。トークンを更新したら **`token_expiry` を書き換える**（忘れると期限切れの通知が毎日届く）。トークンの値は書かない・貼らない。通知文・段階を変えたら `tests/test_token_expiry_notify.py` も直す。
 - **状態確認の応答（`/api/job/<id>`）には `job` を必ず含める**。画面（`web/custom.js`）はジョブIDを別の変数に持っているが、応答を丸ごと代入しても壊れないようにしてある（過去に `/api/job/undefined` で「ジョブが見つかりません」になった。`tests/test_app.py::test_job_status_keeps_job_id`）。

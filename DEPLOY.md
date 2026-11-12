@@ -7,7 +7,7 @@
 
 ## 1. GitHub の fine-grained トークンを作る（公開用）
 1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token。
-2. Repository access: **Only select repositories** → `masauehr/nwp_chart_web` だけ。
+2. Repository access: **Only select repositories** → `masauehr/nwp_chart_web` と `masauehr/tenkizu_web` の2つだけ（tenkizu_web の公開サイトからも載せる・外すため。2026-11-12 追加）。
 3. Permissions: Repository permissions の **Contents: Read and write** だけ（他は付けない）。
 4. 期限: 90日など。名前は `nwp-xsection-api-publish`。**期限は Slack DM で通知される**（期限の14日前から。下の「トークン期限の Slack 通知」）。通知用に期限を `~/.config/nwp_xsection_api/token_expiry` に書く。
 5. 表示されたトークンをコピーする（この画面でしか見えない）。**チャットやファイルに貼らない**。
@@ -60,7 +60,7 @@ URL=https://nwp-xsection-api.onrender.com   # 実際のURLに置き換える
 | Render のインフラ保守 | 告知（例: 2026-11-18 11:00 JST）の間は止まりうる。当日はデプロイを避け、後で動作確認する |
 
 ## トークンの更新（期限が近づいたとき・Slack の通知が届いたとき）
-1. GitHub → Settings → Developer settings → Fine-grained tokens で、**同じ設定**（`nwp_chart_web` だけ・Contents: Read and write だけ・名前 `nwp-xsection-api-publish`）の新しいトークンを作る（古いトークンは、更新後に Delete してよい）。
+1. GitHub → Settings → Developer settings → Fine-grained tokens で、**同じ設定**（`nwp_chart_web` と `tenkizu_web` の2つだけ・Contents: Read and write だけ・名前 `nwp-xsection-api-publish`）の新しいトークンを作る（古いトークンは、更新後に Delete してよい）。
 2. Render の `nwp-xsection-api` → Environment で `GITHUB_TOKEN` を新しい値に差し替えて保存する（自動で再起動する）。トークンの値はチャットやファイルに貼らない。
 3. 公開サイトで1件「公開」して、反映されることを確認する（確認後に外してよい）。
 4. **`~/.config/nwp_xsection_api/token_expiry` を新しい期限（UTC・1行）に書き換える**（例: `2027-02-10T00:00:00Z`。GitHub の画面の期限は日本時間のことがあるので、9時間引く）。書き換えると通知が止まる。忘れると、期限切れの通知が毎日届く。

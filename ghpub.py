@@ -15,7 +15,8 @@ from pathlib import PurePosixPath
 import requests
 
 MAX_ITEMS = 20          # 公開サイトに載せる最大件数（nwp_chart_web の publish.py の CUSTOM_MAX と同じにする）
-NAME_RE = re.compile(r"(?:xsection|emagram)_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
+# 数値モデルの図（xsection/emagram）と、tenkizu_web の自由選択で作る実況エマグラム（sounding_観測時刻_地点_種類）。外す操作で使う
+NAME_RE = re.compile(r"(?:(?:xsection|emagram)_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}|sounding_\d{10}_\d{5}_(?:emagram|pt))\.png")
 
 
 class GitHubError(RuntimeError):
