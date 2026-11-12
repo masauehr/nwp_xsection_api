@@ -17,7 +17,7 @@ services:
       - key: PUBLIC_SITE_URL
         value: https://masauehr.github.io/nwp_chart_web/
       - key: TRUSTED_HOPS
-        value: "1"
+        value: "2"          # 右端の公開アドレスは前段の Cloudflare。自分のIPはその1つ左（2026-11-12 に実機で確認）
       - key: GITHUB_TOKEN
         sync: false
       - key: API_KEYS

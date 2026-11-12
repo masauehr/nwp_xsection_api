@@ -33,7 +33,7 @@ from limits import SlidingWindow
 QUEUE_MAX = int(os.environ.get("QUEUE_MAX", "3"))                      # 待ち行列（実行中を除く）の最大件数
 RENDER_PER_HOUR = int(os.environ.get("RENDER_PER_HOUR", "8"))          # 1つのIPが1時間に新しく作図できる回数（キャッシュに当たる分は数えない）
 GLOBAL_PER_HOUR = int(os.environ.get("GLOBAL_PER_HOUR", "60"))         # 全体で1時間に新しく作図できる回数
-TRUSTED_HOPS = int(os.environ.get("TRUSTED_HOPS", "1"))                # X-Forwarded-For の右から（内部アドレスを除いて）何番目の公開アドレスを相手のIPとみなすか
+TRUSTED_HOPS = int(os.environ.get("TRUSTED_HOPS", "2"))                # X-Forwarded-For の右から（内部アドレスを除いて）何番目の公開アドレスを相手のIPとみなすか（Render は前段に Cloudflare があり、右端の公開アドレスがそれなので 2）
 DEBUG_IP = os.environ.get("DEBUG_IP") == "1"                           # 1 のとき /api/health に受け取った X-Forwarded-For を出す（診断用。確認後は外す）
 ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.environ.get(
     "ALLOWED_ORIGINS", "https://masauehr.github.io,http://127.0.0.1:8790,http://localhost:8790").split(",") if o.strip()}

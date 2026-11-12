@@ -34,7 +34,8 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 | `GITHUB_REPO` / `GITHUB_BRANCH` / `PUBLISH_DIR` | `masauehr/nwp_chart_web` / `gh-pages` / `output/custom` | 公開先 |
 | `PUBLIC_SITE_URL` | `https://masauehr.github.io/nwp_chart_web/` | 公開後に画面へ返すURL |
 | `RENDER_PER_HOUR` / `GLOBAL_PER_HOUR` / `QUEUE_MAX` | 8 / 60 / 3 | IPごとの1時間の作図回数・全体の回数・待ち行列の上限 |
-| `TRUSTED_HOPS` | 1 | `X-Forwarded-For` の右から何番目を相手のIPとみなすか（Render は 1。`/api/health` の `ip` で確認） |
+| `TRUSTED_HOPS` | 2 | `X-Forwarded-For` の右から、内部アドレス（10.x など）を除いて何番目の公開アドレスを相手のIPとみなすか（Render は前段の Cloudflare が右端なので **2**。`/api/health` の `ip` で確認） |
+| `DEBUG_IP` | なし | `1` のとき `/api/health` に受け取った `X-Forwarded-For` を出す（IPの診断用。確認後は外す） |
 | `WORK_DIR` | `/tmp/nwp_xsection` | 画像・取得データの置き場 |
 | `CACHE_MAX_FILES` / `GRIB_MAX_MB` / `RENDER_TIMEOUT` | 40 / 300 / 600 | 画像の保持件数・取得データの保持容量・作図の制限時間（秒） |
 

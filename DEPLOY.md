@@ -36,7 +36,7 @@ gh repo create masauehr/nwp_xsection_api --public --source=. --push
 ```bash
 URL=https://nwp-xsection-api.onrender.com   # 実際のURLに置き換える
 ```
-1. ブラウザで `$URL/api/health` を開く → `{"ok": true, "ip": "…", "publish": true}`。`ip` が**自分のグローバルIP**なら `TRUSTED_HOPS=1` で合っている（別の機関のIPなら `TRUSTED_HOPS` を調整）。
+1. ブラウザで `$URL/api/health` を開く → `{"ok": true, "ip": "…", "publish": true}`。`ip` が**自分のグローバルIPで、リロードしても変わらない**ことを確認する。違う場合は、環境変数 `DEBUG_IP`=`1` を足して `debug.xff` を見る（確認後は `DEBUG_IP` を削除）。Render では前段に Cloudflare があるため `TRUSTED_HOPS=2`（実機で確認済み）。内部アドレス（10.x）は自動で飛ばす。
 2. 画面（次の手順）から断面図を1枚作る。Render の Logs で `作図完了 … ○○秒` を確認する。
 3. **メモリ**: Render の Metrics でメモリのピークを確認する（目安: 400MB 未満）。足りなければ Starter（2GB）に上げる。
 4. **図の文字**: 日本語が豆腐（□）になっていないか確認する。
