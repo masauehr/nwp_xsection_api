@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.masahiro.nwp_xsection_api_token_notify</string>
+
+    <!-- 断面図API（Render）の公開用 GitHub トークンの期限が近づいたら Slack DM で知らせる（期限の14/7/3/2/1日前、期限切れ後は毎日） -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/masahiro/projects/nwp_xsection_api/ops/token_expiry_notify.py</string>
+    </array>
+
+    <!-- 毎日 9:10 JST（nwp_chart_web の通知 9:05 とずらす）。Macがスリープ中だった場合は復帰後に1回実行される -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>9</integer>
+        <key>Minute</key><integer>10</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/masahiro/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/masahiro/.config/nwp_xsection_api/notify.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/masahiro/.config/nwp_xsection_api/notify.log</string>
+</dict>
+</plist>

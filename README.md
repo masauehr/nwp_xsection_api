@@ -63,6 +63,7 @@ $PY tools/make_key.py tanaka              # 合言葉を作る（合言葉は相
 | `opts.py` | 表示要素の指定（軽いモジュール） |
 | `auth.py` / `limits.py` / `ghpub.py` | 合言葉の確認 / 回数制限 / GitHub の Contents API |
 | `tools/make_key.py` | 合言葉の発行 |
+| `ops/token_expiry_notify.py`・`launchd/` | 公開用 GitHub トークンの期限を Slack DM で通知（期限の14/7/3/2/1日前・期限切れ後は毎日。手順は DEPLOY.md） |
 | `assets/coast.json` | 小地図の海岸線（Natural Earth 50m・パブリックドメイン） |
 | `Dockerfile` / `render.yaml` | Render 用 |
 | `tests/` | 単体テスト（検証・描画・認証・GitHub・サーバー全体） |

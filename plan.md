@@ -39,7 +39,8 @@
 - [x] 8d. **エマグラムを追加**（`emagram.py`・全層の高度の取得・`/api/emagram`・画面の種類切り替え。テスト85件・手元の実データ GFS で作図・画面から作図を確認）
   - 全層の高度つきは別ファイル（`_gh`）。MetPy は作図プロセスの中だけ
   - **Render での実測（2026-11-12）**: ECMWF のエマグラムで **114秒・最大メモリ 276MB**（本体を足して約320MB）。公開（GitHub への掲載）も成功
-- [ ] 9. nwp_chart_web の `web/config.js` に Render の URL を入れて push（公開サイトで有効化）
+- [x] 9. nwp_chart_web の `web/config.js` に Render の URL を入れて push（公開サイトで有効化。2026-11-12）
+- [x] 10. 公開用 GitHub トークンの期限を Slack DM で通知（`ops/token_expiry_notify.py`・launchd。Bluesky・nwp_chart_web と同じ方式。2026-11-12 実装・テスト11件）。登録（期限の設定・launchd）と実機の通知確認は DEPLOY.md の手順
 
 ## 実機で確認する項目と結果
 | 項目 | 内容 | 外れたときの対応 |

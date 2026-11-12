@@ -53,9 +53,37 @@ URL=https://nwp-xsection-api.onrender.com   # 実際のURLに置き換える
 | 人を追加 | `tools/make_key.py` で作り、`API_KEYS` に足す（Render の Environment を更新→自動で再起動） |
 | 人を止める | `API_KEYS` からその項目を消す |
 | 合言葉が漏れた | その項目を消して、作り直す |
-| トークンの期限 | 期限前に GitHub で作り直し、`GITHUB_TOKEN` を更新する |
+| トークンの期限 | 期限の14日前から Slack DM で通知が届く。「トークンの更新」の手順で作り直す |
 | 使われすぎ | `RENDER_PER_HOUR`・`GLOBAL_PER_HOUR` を下げる |
 | 無効にしたい | `config.js` の URL を空にして push（公開サイトは閲覧専用に戻る）。Render は停止してよい |
+
+## トークンの更新（期限が近づいたとき・Slack の通知が届いたとき）
+1. GitHub → Settings → Developer settings → Fine-grained tokens で、**同じ設定**（`nwp_chart_web` だけ・Contents: Read and write だけ・名前 `nwp-xsection-api-publish`）の新しいトークンを作る（古いトークンは、更新後に Delete してよい）。
+2. Render の `nwp-xsection-api` → Environment で `GITHUB_TOKEN` を新しい値に差し替えて保存する（自動で再起動する）。トークンの値はチャットやファイルに貼らない。
+3. 公開サイトで1件「公開」して、反映されることを確認する（確認後に外してよい）。
+4. **`~/.config/nwp_xsection_api/token_expiry` を新しい期限（UTC・1行）に書き換える**（例: `2027-02-10T00:00:00Z`。GitHub の画面の期限は日本時間のことがあるので、9時間引く）。書き換えると通知が止まる。忘れると、期限切れの通知が毎日届く。
+
+## トークン期限の Slack 通知
+Bluesky 自動投稿・nwp_chart_web と同じ方式（launchd が毎日起動し、`openclaw message send` で Slack DM に送る。部品は共有せずコピー）。
+
+| 項目 | 内容 |
+|---|---|
+| スクリプト | `ops/token_expiry_notify.py`（標準ライブラリのみ） |
+| 実行 | launchd `com.masahiro.nwp_xsection_api_token_notify`（`launchd/` に雛形。毎日 9:10 JST。Mac がスリープ中なら復帰後に1回） |
+| 設定（git 管理外） | `~/.config/nwp_xsection_api/token_expiry`（期限・UTC・1行）・`slack_to`（通知先・`slack:Uxxxx`）・`notify_state.json`（自動）・`notify.log` |
+| 通知する時 | 期限の **14日前・7日前・3日前・2日前・1日前**。期限切れ後は毎日（`token_expiry` を書き換えるまで）。送れなかった分は次の実行で再送 |
+| 内容 | 残り日数・期限（日本時間）・更新手順の場所。トークンの値は含めない |
+
+登録（初回だけ）:
+```bash
+mkdir -p ~/.config/nwp_xsection_api
+echo "2027-02-10T00:00:00Z" > ~/.config/nwp_xsection_api/token_expiry     # 実際の期限（UTC）に
+cp ~/.config/nwp_chart_web/slack_to ~/.config/nwp_xsection_api/slack_to     # 通知先は nwp_chart_web と同じでよい
+cp launchd/com.masahiro.nwp_xsection_api_token_notify.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.masahiro.nwp_xsection_api_token_notify.plist
+/opt/homebrew/bin/python3 ops/token_expiry_notify.py --test                 # テスト通知（届けば正常）
+/opt/homebrew/bin/python3 ops/token_expiry_notify.py --dry-run --now 2027-01-27T00:00:00Z   # 通知文の確認（送らない）
+```
 
 ## 困ったとき
 - **ビルドで pygrib が入らない**: Dockerfile の apt に `libeccodes-dev gcc` を足し、`pip install pygrib` がソースからビルドできるようにする。
@@ -63,3 +91,4 @@ URL=https://nwp-xsection-api.onrender.com   # 実際のURLに置き換える
 - **「公開サイトへの反映に失敗しました」**: トークンの権限・期限・対象リポジトリを確認。`502` のログに HTTP ステータスが出る。
 - **最初の応答が遅い**: 無料枠のスリープ明け（約50秒）。Starter にすると常時起動。
 - **429**: 回数制限。待つか、上限を調整する。
+- **Slack の通知が届かない**: `~/.config/nwp_xsection_api/notify.log` を見る。`slack_to`・`token_expiry` の有無、`openclaw` が使えるか（`openclaw message send` が通るか）を確認する。
