@@ -28,7 +28,8 @@ GRIB_DIR = WORK_DIR / "grib"
 CACHE_MAX_FILES = int(os.environ.get("CACHE_MAX_FILES", "40"))             # 画像（png＋json）の保持件数
 GRIB_MAX_BYTES = int(float(os.environ.get("GRIB_MAX_MB", "300")) * 1024 * 1024)   # 取得データの保持容量
 INIT_MAX_DAYS = 10     # これより古い初期値は受け付けない（配信元に残っていない）
-NAME_RE = re.compile(r"xsection_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
+KINDS = ("xsection", "emagram")
+NAME_RE = re.compile(r"(?:xsection|emagram)_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
 
 
 class CustomError(ValueError):
@@ -45,8 +46,11 @@ def _num(v, name, lo, hi):
     return x
 
 
-def validate(model, init_s, ft, q, now=None):
-    """入力を検証して正規化した dict を返す。配信されていないはずの初期値・予報時間は、配信元に問い合わせる前に弾く。"""
+def validate(model, init_s, ft, q, now=None, kind="xsection"):
+    """入力を検証して正規化した dict を返す。配信されていないはずの初期値・予報時間は、配信元に問い合わせる前に弾く。
+    kind: xsection（断面図。lat1・lon1・lat2・lon2 と表示要素）／ emagram（エマグラム。lat・lon）。"""
+    if kind not in KINDS:
+        raise CustomError("kind は xsection / emagram のどちらかです")
     if model not in nwp_data.MODELS:
         raise CustomError("モデルが不正です（ecmwf / gfs / aifs）")
     if not re.fullmatch(r"\d{10}", init_s or ""):
@@ -65,8 +69,11 @@ def validate(model, init_s, ft, q, now=None):
     ft = int(_num(ft, "予報時間", 0, 360))
     if not nwp_data.step_ok(model, init, ft):
         raise CustomError(f"{nwp_data.MODELS[model]['label']} {init_s} には予報時間 {ft}h がありません（3時間刻み・AIFSは6時間刻み・ECMWFの06/18UTCは90hまで）")
-    p = dict(model=model, init=init_s, ft=ft)
+    p = dict(kind=kind, model=model, init=init_s, ft=ft)
     c = nwp_data.CROP        # データを読む範囲の中に限る
+    if kind == "emagram":
+        p.update(lat=_num(q.get("lat"), "緯度", c["lat0"], c["lat1"]), lon=_num(q.get("lon"), "経度", c["lon0"], c["lon1"]))
+        return p
     p.update(lat1=_num(q.get("lat1"), "始点の緯度", c["lat0"], c["lat1"]), lon1=_num(q.get("lon1"), "始点の経度", c["lon0"], c["lon1"]),
              lat2=_num(q.get("lat2"), "終点の緯度", c["lat0"], c["lat1"]), lon2=_num(q.get("lon2"), "終点の経度", c["lon0"], c["lon1"]))
     span = max(abs(p["lat2"] - p["lat1"]), abs(p["lon2"] - p["lon1"]))
@@ -89,7 +96,7 @@ def image_name(p):
     """条件から決まる画像名（同じ条件は同じ名前）。"""
     key = "_".join(f"{k}={p[k]}" for k in sorted(p))
     h = hashlib.sha1(key.encode()).hexdigest()[:12]
-    return f"xsection_{p['model']}_{p['init']}_{p['ft']:03d}_{h}.png"
+    return f"{p['kind']}_{p['model']}_{p['init']}_{p['ft']:03d}_{h}.png"
 
 
 def out_path(p):
@@ -102,7 +109,9 @@ def opts_of(p):
 
 
 def describe(p):
-    """画面に出す名前（断面線＋表示要素）。"""
+    """画面に出す名前（断面線＋表示要素、またはエマグラムの地点）。"""
+    if p["kind"] == "emagram":
+        return f"エマグラム ({p['lat']:g}N,{p['lon']:g}E)"
     base = f"断面 ({p['lat1']:g}N,{p['lon1']:g}E)→({p['lat2']:g}N,{p['lon2']:g}E)"
     return base + " ｜ " + opts.options_text(opts_of(p))
 
@@ -128,7 +137,7 @@ def read_meta(name):
 def write_meta(out, p):
     """画像の隣に条件を書く。形式は nwp_chart_web の custom.py と同じ（公開側の list.json の項目になる）。"""
     now = time.time()
-    meta = dict(kind="xsection", mk=p["model"], ik=p["init"], ft=p["ft"], label=describe(p),
+    meta = dict(kind=p["kind"], mk=p["model"], ik=p["init"], ft=p["ft"], label=describe(p),
                 model=nwp_data.MODELS[p["model"]]["label"], initText=init_text(p["init"]),
                 legal=nwp_data.legal_short(p["model"], int(p["init"][:4]), time.strftime("%Y-%m-%d", time.gmtime(now))),
                 created=now)
@@ -160,22 +169,26 @@ def prune_grib():
         f.unlink(missing_ok=True)
 
 
-def npz_path(model, init, ft):
-    return nwp_data.grib_path(model, init, ft, GRIB_DIR).with_suffix(".npz")
+def npz_path(model, init, ft, all_gh=False):
+    return nwp_data.grib_path(model, init, ft, GRIB_DIR, all_gh).with_suffix(".npz")
 
 
-def load_F(model, init_s, ft):
-    """格子データ F を返す。無ければ取得して .npz にする（GRIB2 の展開は別プロセス）。"""
+def load_F(model, init_s, ft, kind="xsection"):
+    """格子データ F を返す。無ければ取得して .npz にする（GRIB2 の展開は別プロセス）。
+    エマグラムは全層の高度が要る（別ファイル _gh）。断面図は、全層の高度つきがあればそれも使える（上位互換）。"""
     init = nwp_data.parse_init(init_s)
-    npz = npz_path(model, init, ft)
-    if npz.exists():
-        try:
-            os.utime(npz, None)
-            return nwp_data.load_npz(npz)
-        except Exception:
-            npz.unlink(missing_ok=True)       # 壊れていたら取り直す
+    all_gh = kind == "emagram"
+    for cand in ((True,) if all_gh else (False, True)):
+        npz = npz_path(model, init, ft, cand)
+        if npz.exists():
+            try:
+                os.utime(npz, None)
+                return nwp_data.load_npz(npz)
+            except Exception:
+                npz.unlink(missing_ok=True)       # 壊れていたら取り直す
+    npz = npz_path(model, init, ft, all_gh)
     prune_grib()
-    grib = nwp_data.fetch_subset(model, init, ft, GRIB_DIR)
+    grib = nwp_data.fetch_subset(model, init, ft, GRIB_DIR, all_gh=all_gh)
     if grib is None:
         raise CustomError(f"{nwp_data.MODELS[model]['label']} {init_s} FT{ft}h のデータを取得できません"
                           "（まだ配信されていないか、配信元が混雑しています。初期値・予報時間を確認してください）")
@@ -203,12 +216,19 @@ def render(p):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     init = nwp_data.parse_init(p["init"])
     label = nwp_data.MODELS[p["model"]]["label"]
-    F = load_F(p["model"], p["init"], p["ft"])
+    F = load_F(p["model"], p["init"], p["ft"], p["kind"])
     tmp = out.with_suffix(".tmp.png")
     try:
-        import xsection
-        xsection.render_xsection(F, init, p["ft"], (p["lat1"], p["lon1"]), (p["lat2"], p["lon2"]), str(tmp),
-                                 model=label, name=describe(p).split(" ｜ ")[0], opts=opts_of(p))
+        if p["kind"] == "emagram":
+            import emagram
+            try:
+                emagram.render_emagram(F, init, p["ft"], p["lat"], p["lon"], str(tmp), model=label)
+            except ValueError as e:
+                raise CustomError(str(e))
+        else:
+            import xsection
+            xsection.render_xsection(F, init, p["ft"], (p["lat1"], p["lon1"]), (p["lat2"], p["lon2"]), str(tmp),
+                                     model=label, name=describe(p).split(" ｜ ")[0], opts=opts_of(p))
         tmp.replace(out)
         write_meta(out, p)
     finally:

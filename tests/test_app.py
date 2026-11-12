@@ -198,3 +198,25 @@ def test_client_ip_skips_internal_proxies():
     assert app.client_ip("133.1.2.3, 10.20.30.40", "10.0.0.1", 2) == "10.0.0.1"                # 公開アドレスが足りなければ接続元（安全側）
     assert app.client_ip("10.1.1.1, 192.168.0.5, fe80::1, ::1, 127.0.0.1", "9.9.9.9", 1) == "9.9.9.9"
     assert app.client_ip("not-an-ip, 133.1.2.3", "9.9.9.9", 1) == "133.1.2.3"
+
+
+def test_emagram_flow_and_publish(srv):
+    """エマグラムも、断面図と同じ流れ（受付→ジョブ→画像→公開）で扱える。種類ごとに別の画像になる。"""
+    q = f"model=gfs&init={init_str()}&ft=12&lat=26.2&lon=127.7"
+    code, j, _ = jcall(srv["base"], "/api/emagram?" + q)
+    assert code == 202
+    done = wait_done(srv["base"], j["job"])
+    assert done["state"] == "done" and done["name"].startswith("emagram_gfs_") and "エマグラム" in done["label"]
+    assert srv["calls"][-1]["kind"] == "emagram"
+    x = jcall(srv["base"], "/api/xsection?" + Q.format(init=init_str()))[1]
+    assert wait_done(srv["base"], x["job"])["name"].startswith("xsection_")
+    h = {"Authorization": f"Bearer {KEY}", "Origin": ORIGIN}
+    code, j2, _ = jcall(srv["base"], "/api/publish", "POST", {"name": done["name"]}, h)
+    assert code == 200 and j2["names"] == [done["name"]]
+    item = json.loads(srv["gh"].files["output/custom/list.json"][0])["items"][0]
+    assert item["kind"] == "emagram" and item["url"] == f"output/custom/{done['name']}"
+
+
+def test_emagram_needs_lat_lon(srv):
+    code, j, _ = jcall(srv["base"], "/api/emagram?model=gfs&init=" + init_str() + "&ft=12&lat1=45&lon1=130")
+    assert code == 400 and "緯度" in j["error"]

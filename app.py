@@ -4,6 +4,7 @@
 
   GET  /api/health                 → 動作確認（{"ok":true, "ip":…}。ip は回数制限が見ている相手のアドレス）
   GET  /api/xsection?model=gfs&init=YYYYMMDDHH&ft=12&lat1=..&lon1=..&lat2=..&lon2=..&shade=..&contours=..&barbs=..
+  GET  /api/emagram?model=gfs&init=YYYYMMDDHH&ft=12&lat=..&lon=..
                                    → 認証なし。同じ条件の画像があれば {"state":"done",…}、無ければ作図ジョブを作って 202 {"state":"queued","job":id}
   GET  /api/job/<id>               → ジョブの状態（queued / running / done / error）。done なら url・label などを返す
   GET  /img/<名前>.png             → 作図した画像
@@ -194,8 +195,8 @@ class Handler(BaseHTTPRequestHandler):
             if DEBUG_IP:
                 body["debug"] = {"xff": self.headers.get("X-Forwarded-For"), "peer": self.client_address[0]}
             self._json(200, body)
-        elif u.path == "/api/xsection":
-            self._xsection({k: v[0] for k, v in parse_qs(u.query).items()})
+        elif u.path in ("/api/xsection", "/api/emagram"):
+            self._make(u.path.rsplit("/", 1)[1], {k: v[0] for k, v in parse_qs(u.query).items()})
         elif u.path.startswith("/api/job/"):
             self._job(u.path[len("/api/job/"):])
         elif u.path.startswith("/img/"):
@@ -208,9 +209,10 @@ class Handler(BaseHTTPRequestHandler):
         return {"state": "done", "name": name, "url": f"/img/{name}", "label": meta.get("label"), "model": meta.get("model"),
                 "initText": meta.get("initText"), "ft": meta.get("ft"), "legal": meta.get("legal")}
 
-    def _xsection(self, q):
+    def _make(self, kind, q):
+        """作図の受付（kind: xsection＝断面図・emagram＝エマグラム）。"""
         try:
-            p = engine.validate(q.get("model"), q.get("init"), q.get("ft"), q)
+            p = engine.validate(q.get("model"), q.get("init"), q.get("ft"), q, kind=kind)
         except engine.CustomError as e:
             self._json(400, {"error": str(e)})
             return

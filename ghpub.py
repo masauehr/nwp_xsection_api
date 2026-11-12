@@ -15,7 +15,7 @@ from pathlib import PurePosixPath
 import requests
 
 MAX_ITEMS = 10          # 公開サイトに載せる最大件数（publish.py の CUSTOM_MAX と同じ）
-NAME_RE = re.compile(r"xsection_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
+NAME_RE = re.compile(r"(?:xsection|emagram)_[a-z0-9]+_\d{10}_\d{3}_[0-9a-f]{12}\.png")
 
 
 class GitHubError(RuntimeError):

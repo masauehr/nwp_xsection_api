@@ -108,7 +108,7 @@ def _ecmwf_rows(model, init, ft):
     return [json.loads(l) for l in r.text.splitlines() if l.strip()]
 
 
-def _ecmwf_select(rows, model="ecmwf", plevels=None):
+def _ecmwf_select(rows, model="ecmwf", plevels=None, all_gh=False):
     """必要なメッセージの (offset, length) を返す。AIFSは相対湿度 r が無いので比湿 q も取る。"""
     pl = {str(l) for l in (plevels or PLEVELS)}
     pvars = ("t", "u", "v", "r", "w") + (("q",) if model == "aifs" else ())
@@ -117,14 +117,15 @@ def _ecmwf_select(rows, model="ecmwf", plevels=None):
         p, lt = r["param"], r.get("levtype")
         if lt == "pl" and p in pvars and r.get("levelist") in pl:
             out.append((r["_offset"], r["_length"]))
-        elif lt == "pl" and p == "gh" and r.get("levelist") == str(GH_LEVEL):      # 高度は小地図の500hPaだけ（取得量とメモリを減らす）
+        elif lt == "pl" and p == "gh" and (r.get("levelist") == str(GH_LEVEL) or (all_gh and r.get("levelist") in pl)):
+            # 高度は小地図の500hPaだけ（取得量とメモリを減らす）。エマグラム（ホドグラフの高度）のときだけ全層
             out.append((r["_offset"], r["_length"]))
         elif lt == "sfc" and p == "sp":
             out.append((r["_offset"], r["_length"]))
     return out
 
 
-def _gfs_select(init, ft, plevels=None):
+def _gfs_select(init, ft, plevels=None, all_gh=False):
     r = requests.get(index_url("gfs", init, ft), headers=HEADERS, timeout=60)
     r.raise_for_status()
     lines = r.text.strip().splitlines()
@@ -139,7 +140,7 @@ def _gfs_select(init, ft, plevels=None):
     for var, level, off, ln in rows:
         if var in ("TMP", "UGRD", "VGRD", "RH", "VVEL") and level in lv:
             out.append((off, ln))
-        elif var == "HGT" and level == f"{GH_LEVEL} mb":                         # 高度は小地図の500hPaだけ
+        elif var == "HGT" and (level == f"{GH_LEVEL} mb" or (all_gh and level in lv)):   # 高度は小地図の500hPaだけ。エマグラムのときだけ全層
             out.append((off, ln))
         elif var == "PRES" and level == "surface":
             out.append((off, ln))
@@ -185,17 +186,19 @@ def _download_ranges(url: str, ranges, dest: Path) -> Path | None:
         return None
 
 
-def grib_path(model: str, init: datetime, ft: int, data_dir: Path = DEFAULT_DATA_DIR) -> Path:
-    return Path(data_dir) / model / f"{init:%Y%m%d%H}" / f"f{ft:03d}.grib2"
+def grib_path(model: str, init: datetime, ft: int, data_dir: Path = DEFAULT_DATA_DIR, all_gh: bool = False) -> Path:
+    """取得データの置き場。全層の高度つき（エマグラム用）は別ファイル名（_gh）にして、断面図用と混ざらないようにする。"""
+    return Path(data_dir) / model / f"{init:%Y%m%d%H}" / f"f{ft:03d}{'_gh' if all_gh else ''}.grib2"
 
 
-def fetch_subset(model: str, init: datetime, ft: int, data_dir: Path = DEFAULT_DATA_DIR, plevels=None) -> Path | None:
-    """必要な変数だけを取得して data_dir/{model}/{初期値}/f{FFF}.grib2 に保存。既存ならスキップ。"""
-    dest = grib_path(model, init, ft, data_dir)
+def fetch_subset(model: str, init: datetime, ft: int, data_dir: Path = DEFAULT_DATA_DIR, plevels=None, all_gh: bool = False) -> Path | None:
+    """必要な変数だけを取得して data_dir/{model}/{初期値}/f{FFF}.grib2 に保存。既存ならスキップ。all_gh: 全層の高度も取る（エマグラム用）。"""
+    dest = grib_path(model, init, ft, data_dir, all_gh)
     if dest.exists() and dest.stat().st_size > 0:
         return dest
     try:
-        sel = _ecmwf_select(_ecmwf_rows(model, init, ft), model, plevels) if model in ECMWF_LIKE else _gfs_select(init, ft, plevels)
+        sel = (_ecmwf_select(_ecmwf_rows(model, init, ft), model, plevels, all_gh) if model in ECMWF_LIKE
+               else _gfs_select(init, ft, plevels, all_gh))
     except requests.RequestException as e:
         print(f"  索引の取得に失敗 {model} FT{ft}: {e}", flush=True)
         return None
@@ -256,7 +259,7 @@ def load_fields(model: str, path: Path, plevels=None) -> dict:
     """取得済みのGRIB2を断面図用の辞書にする。
 
     返り値: {"lats"(昇順),"lons","sp"(hPa),
-             "p": {気圧: {"t"(℃),"u","v","r"(%),"w"(hPa/h)（500hPaだけ "gh"(m) も）}}}
+             "p": {気圧: {"t"(℃),"u","v","r"(%),"w"(hPa/h)（500hPaだけ "gh"(m) も。エマグラム用の取得では全層）}}}
     """
     import numpy as np
     d = _read(Path(path), plevels)
