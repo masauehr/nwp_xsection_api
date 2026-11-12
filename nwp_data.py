@@ -14,6 +14,7 @@ nwp_chart_web の nwp_data.py のコピーを、断面図に必要な部分だ�
          NOAAの成果物（米国政府、出典明記を推奨）。
 """
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -162,7 +163,7 @@ def _merge(ranges):
 def _download_ranges(url: str, ranges, dest: Path) -> Path | None:
     """指定バイト範囲を連結して dest に保存（GRIB2はメッセージ連結でそのまま読める）。"""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(".part")
+    tmp = dest.with_name(f"{dest.name}.{os.getpid()}.part")        # プロセスごとに別名（同じファイルを同時に取得しても、お互いの一時ファイルを壊さない）
     try:
         with open(tmp, "wb") as f:
             for off, ln in _merge(ranges):
@@ -178,7 +179,7 @@ def _download_ranges(url: str, ranges, dest: Path) -> Path | None:
                         if attempt == 2:
                             raise
                         time.sleep(2 * (attempt + 1))
-        tmp.rename(dest)
+        tmp.replace(dest)
         return dest
     except requests.RequestException as e:
         print(f"  ダウンロード失敗 {dest.name}: {e}", flush=True)

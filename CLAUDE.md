@@ -22,6 +22,8 @@
 - GitHub への書き込みは対象リポジトリの `output/custom/` の画像と `list.json` だけ（`ghpub.py`）。画面ファイルやモデルの画像には触れない。形式は nwp_chart_web の `publish.py --custom` と同じにする（`list.json` の項目: kind・mk・ik・ft・label・model・initText・url・ts。`pub`（公開した時刻）・`by` は追加項目）。
 
 ## 落とし穴
+- **状態確認の応答（`/api/job/<id>`）には `job` を必ず含める**。画面（`web/custom.js`）はジョブIDを別の変数に持っているが、応答を丸ごと代入しても壊れないようにしてある（過去に `/api/job/undefined` で「ジョブが見つかりません」になった。`tests/test_app.py::test_job_status_keeps_job_id`）。
+- 取得の一時ファイルは `<名前>.<pid>.part`（プロセスごとに別名）。同じファイルを2つのプロセスが同時に取っても、お互いを壊さない。
 - **新しい `.py` を足したら Dockerfile の `COPY` にも入れる**（入れ忘れると Render で起動時に落ちる。`tests/test_dockerfile.py` が確認）。依存を足したら `requirements.txt` にも（エマグラムの MetPy は `requirements.txt`）。
 - **pygrib の切り出しは必ずコピーする**（`np.array(…)`）。ビューのままだと切り出し前の全球配列が残り、メモリが約300MB増える。
 - 高度（gh）は、断面図では 500hPa だけ取る（小地図用）。**エマグラムは全層の高度が要る**（ホドグラフの色分け）ので、別ファイル（`_gh`）で取る（`nwp_data.grib_path(all_gh=True)`）。

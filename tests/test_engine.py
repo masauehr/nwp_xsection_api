@@ -155,3 +155,43 @@ def test_children_peak_mb_after_a_child_runs():
     subprocess.run([sys.executable, "-c", "x = bytearray(30 * 1024 * 1024)"], check=True)
     peak = engine.children_peak_mb()
     assert peak is not None and 30 < peak < 400
+
+
+class _Resp:
+    status_code = 206
+    content = b"GRIB"
+
+
+def test_download_uses_per_process_temp_name_and_leaves_no_part(tmp_path, monkeypatch):
+    """取得の一時ファイルはプロセスごとに別名。完了後は目的のファイルだけが残る。"""
+    import os
+    seen = []
+    monkeypatch.setattr(nwp_data.requests, "get", lambda *a, **k: (seen.append(1), _Resp())[1])
+    dest = tmp_path / "f012.grib2"
+    assert nwp_data._download_ranges("http://x", [(0, 4)], dest) == dest
+    assert dest.read_bytes() == b"GRIB" and not list(tmp_path.glob("*.part")) and seen
+
+
+def test_download_survives_another_process_finishing_first(tmp_path, monkeypatch):
+    """別のプロセスが同じファイルを先に完成させても、こちらの取得は失敗しない（一時ファイル名が別のため）。"""
+    dest = tmp_path / "f012.grib2"
+
+    def get(*a, **k):
+        dest.write_bytes(b"OTHER")                 # 取得の途中で、別のプロセスが先に完成させた
+        return _Resp()
+    monkeypatch.setattr(nwp_data.requests, "get", get)
+    assert nwp_data._download_ranges("http://x", [(0, 4)], dest) == dest
+    assert dest.exists() and not list(tmp_path.glob("*.part"))
+
+
+def test_prune_grib_removes_stale_part_files(tmp_path, monkeypatch):
+    import os
+    monkeypatch.setattr(engine, "GRIB_DIR", tmp_path)
+    d = tmp_path / "gfs" / "2026111100"
+    d.mkdir(parents=True)
+    old, new = d / "f003.grib2.111.part", d / "f006.grib2.222.part"
+    old.write_bytes(b"x")
+    new.write_bytes(b"x")
+    os.utime(old, (1000, 1000))
+    engine.prune_grib()
+    assert not old.exists() and new.exists()

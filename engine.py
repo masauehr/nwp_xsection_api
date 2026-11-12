@@ -156,7 +156,13 @@ def prune_cache():
 
 
 def prune_grib():
-    """取得データ（.npz・取り残しの .grib2）が上限を超えたら、古い順に消す（ディスクが小さい前提）。"""
+    """取得データ（.npz・取り残しの .grib2）が上限を超えたら、古い順に消す（ディスクが小さい前提）。取り残しの一時ファイル（.part）も消す。"""
+    try:
+        for f in GRIB_DIR.glob("*/*/*.part"):
+            if time.time() - f.stat().st_mtime > 3600:             # 1時間以上前の取り残し（取得は数分で終わる）
+                f.unlink(missing_ok=True)
+    except OSError:
+        pass
     try:
         files = sorted([*GRIB_DIR.glob("*/*/*.npz"), *GRIB_DIR.glob("*/*/*.grib2")], key=lambda f: f.stat().st_mtime)
     except OSError:

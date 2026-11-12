@@ -243,13 +243,13 @@ class Handler(BaseHTTPRequestHandler):
     def _job(self, jid):
         job = self.jobs.get(jid)
         if job is None:
-            self._json(404, {"error": "ジョブが見つかりません（再起動で消えた可能性があります。もう一度作図してください）"})
+            self._json(404, {"error": "作図の記録が見つかりません（サーバーが再起動して消えた可能性があります）。同じ条件でもう一度作図してください"})
         elif job["state"] == "done":
             self._json(200, self._done(job["name"]))
         elif job["state"] == "error":
             self._json(200, {"state": "error", "error": job["msg"]})
         else:
-            self._json(200, {"state": job["state"], "msg": job["msg"], "position": self.jobs.position(job)})
+            self._json(200, {"state": job["state"], "job": jid, "msg": job["msg"], "position": self.jobs.position(job)})
 
     def _img(self, name):
         if not engine.NAME_RE.fullmatch(name):

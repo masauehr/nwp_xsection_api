@@ -220,3 +220,13 @@ def test_emagram_flow_and_publish(srv):
 def test_emagram_needs_lat_lon(srv):
     code, j, _ = jcall(srv["base"], "/api/emagram?model=gfs&init=" + init_str() + "&ft=12&lat1=45&lon1=130")
     assert code == 400 and "緯度" in j["error"]
+
+
+def test_job_status_keeps_job_id(srv):
+    """待機中・作図中の状態確認の応答にも job が入っている（画面が応答で変数を置き換えても、次の確認でIDを失わない）。"""
+    j = jcall(srv["base"], "/api/xsection?" + Q.format(init=init_str()))[1]
+    code, s, _ = jcall(srv["base"], f"/api/job/{j['job']}")
+    assert code == 200 and s["state"] in ("queued", "running") and s["job"] == j["job"]
+    code, s2, _ = jcall(srv["base"], f"/api/job/{s['job']}")           # 応答の job で、もう一度確認できる
+    assert code == 200
+    wait_done(srv["base"], j["job"])
