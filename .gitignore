@@ -1,0 +1,14 @@
+# 秘密・環境
+.env
+.env.*
+*.pem
+*.key
+
+# 実行時に作られるもの
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+output/
+logs/
+.venv/

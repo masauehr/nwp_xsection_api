@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest
+# 相当温位の突き合わせテスト用（無くてもテストは飛ばされるだけ）
+metpy

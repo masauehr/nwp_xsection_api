@@ -1,0 +1,24 @@
+# Render の Blueprint（New → Blueprint でこのリポジトリを選ぶと、この設定で作られる）。
+# 秘密（GITHUB_TOKEN・API_KEYS）は sync: false にしてあり、Render の画面で入力する（リポジトリには入れない）。
+services:
+  - type: web
+    name: nwp-xsection-api
+    runtime: docker
+    plan: free            # メモリ512MB。足りなければ starter に上げる（README の「メモリ」を参照）
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: https://masauehr.github.io
+      - key: GITHUB_REPO
+        value: masauehr/nwp_chart_web
+      - key: GITHUB_BRANCH
+        value: gh-pages
+      - key: PUBLIC_SITE_URL
+        value: https://masauehr.github.io/nwp_chart_web/
+      - key: TRUSTED_HOPS
+        value: "1"
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: API_KEYS
+        sync: false
