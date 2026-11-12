@@ -4,11 +4,11 @@
 
 ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任意の断面線の鉛直断面図**と**任意の地点のエマグラム**を作って返す小さな API です。
 [nwp_chart_web](https://github.com/masauehr/nwp_chart_web)（数値モデル天気図ビューア）の公開サイトから呼ばれ、作った図を公開サイト（GitHub Pages）に載せる処理も代行します。
-**断面図**と**エマグラム**（気温・露点・持ち上げ気塊・CAPE/CIN・ホドグラフ）を作れます。
+エマグラムは気温・露点・持ち上げ気塊・CAPE/CIN・ホドグラフ・地点の小地図つきです。
 
 - 作図は**認証なし**（回数制限あり）。公開サイトに載せるときだけ**合言葉**が要ります（GitHub への登録は不要）。
 - 標準ライブラリの HTTP サーバー＋ numpy / scipy / matplotlib / pygrib。cartopy は使いません（軽量化）。MetPy はエマグラム（SkewT・CAPE）の作図の別プロセスの中でだけ読み込みます（サーバー本体・断面図には読み込みません）。
-- Render の無料枠（メモリ512MB）に収める設計です（実測の合計メモリの最大 約347MB・待機時 約36MB）。
+- Render の無料枠（メモリ512MB）に収める設計です。**Render の実測**: 作図・展開プロセスの最大メモリは断面図 197MB（72〜93秒）・エマグラム 276MB（114秒）、待機時は約36MB（手元の Mac では断面図の合計 約347MB）。
 
 ## API
 | 呼び方 | 認証 | 内容 |
@@ -16,7 +16,7 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 | `GET /api/health` | なし | 動作確認。`ip` は回数制限が見ている相手のアドレス |
 | `GET /api/xsection?model=gfs&init=YYYYMMDDHH&ft=12&lat1=45&lon1=130&lat2=25&lon2=130[&shade=&contours=&barbs=]` | なし | 同じ条件の画像があれば `200 {"state":"done",…}`、無ければジョブを作って `202 {"state":"queued","job":…}` |
 | `GET /api/emagram?model=gfs&init=YYYYMMDDHH&ft=12&lat=26.2&lon=127.7` | なし | エマグラム。受付・応答は断面図と同じ（`202`→ジョブ→画像）。地点は緯度 −15〜82・経度 50〜185 の中 |
-| `GET /api/job/<id>` | なし | `queued` / `running` / `done`（`url`・`label`・`legal` つき）/ `error` |
+| `GET /api/job/<id>` | なし | `queued` / `running`（`job`・`msg`・`position`）/ `done`（`url`・`label`・`legal` つき）/ `error`。サーバーが再起動して記録が消えていると `404`（画面は同じ条件を自動で再送する） |
 | `GET /img/<名前>.png` | なし | 作った画像（`/tmp` の短期キャッシュ。時間が経つと消える） |
 | `POST /api/publish` `{"name":"xsection_….png"}` | `Authorization: Bearer <合言葉>` | 公開サイトの `output/custom/` に載せる（直近20件） |
 | `POST /api/unpublish` `{"name":…}` | 同上 | 公開サイトから外す |
@@ -45,11 +45,11 @@ ECMWF（IFS・AIFS）オープンデータと NOAA GFS（0.25°）から、**任
 ## ローカルで動かす・テスト
 ```bash
 PY=/opt/anaconda3/envs/met_env_310/bin/python
-$PY -m pytest tests                       # 85件・約12秒（ネットワーク不要。エマグラムのテストは MetPy が要る）
+$PY -m pytest tests                       # 100件・約12秒（ネットワーク不要。エマグラムのテストは MetPy が要る）
 PORT=8800 $PY app.py                      # 公開（GitHub への掲載）は GITHUB_TOKEN と API_KEYS が無いと無効（作図は使える）
 $PY tools/make_key.py tanaka              # 合言葉を作る（合言葉は相手に渡し、ハッシュの行を API_KEYS に足す）
 ```
-画面側（nwp_chart_web の `web/config.js` の `NWP_XSECTION_API`）に URL を入れると、公開サイトの「自由選択」ページで断面図を作れます。
+画面側（nwp_chart_web の `web/config.js` の `NWP_XSECTION_API`）に URL を入れると、公開サイトの「断面図・エマグラム作成」ページで断面図・エマグラムを作れます（2026-11-12 に有効化済み）。
 
 ## ファイル構成
 | ファイル | 内容 |

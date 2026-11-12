@@ -5,7 +5,7 @@
 
 ## 実行環境
 - Python: `/opt/anaconda3/envs/met_env_310/bin/python`（pygrib・scipy・matplotlib・requests・pillow・metpy。テストは pytest）。`python -I` は使わない。
-- テスト: `python -m pytest tests`（ネットワーク不要・約10秒）。起動: `PORT=8800 python app.py`。
+- テスト: `python -m pytest tests`（ネットワーク不要・約12秒・100件）。起動: `PORT=8800 python app.py`。
 - ローカルで試すとき、**8790 は nwp_chart_web のサーバー、8791 は tenkizu_web が使う**。別のポート（API は 8800 など）を使い、既存のサーバーを止めない。
 
 ## 規約
