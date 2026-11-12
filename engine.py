@@ -222,6 +222,17 @@ def render(p):
 RENDER_TIMEOUT = int(os.environ.get("RENDER_TIMEOUT", "600"))
 
 
+def children_peak_mb():
+    """これまでに終了した子プロセス（作図・GRIB2展開）のうち、最大のメモリ使用量[MB]（このサーバーが起動してからの最大）。
+    Linux の ru_maxrss は KB、macOS は bytes。取れなければ None。"""
+    try:
+        import resource
+        v = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    except (ImportError, OSError):
+        return None
+    return v / (1024 * 1024) if sys.platform == "darwin" else v / 1024
+
+
 def render_subprocess(p):
     """作図を別プロセスで行い、PNG のパスを返す。作図が終わればプロセスごとメモリが戻るので、サーバー本体は小さいままでいられる。
     入力・データの問題（CustomError）は、そのメッセージのまま CustomError で返す。"""
@@ -239,6 +250,8 @@ def render_subprocess(p):
         except (ValueError, KeyError):
             pass
     print("作図プロセスが失敗:", (r.stderr or "").strip()[-800:], flush=True)
+    if r.returncode in (-9, 137):          # SIGKILL: 多くはメモリ不足（OOM）で強制終了された
+        print("  → 強制終了されました。メモリ不足の可能性があります（Render の無料枠は512MB）", flush=True)
     raise RuntimeError(f"作図プロセスが異常終了しました（終了コード {r.returncode}）")
 
 

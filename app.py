@@ -110,7 +110,8 @@ class Jobs:
             try:
                 out = self.render_fn(job["p"])
                 job["state"], job["msg"] = "done", "完了"
-                log("作図完了", out.name, f"{time.time() - t:.0f}秒")
+                peak = engine.children_peak_mb()
+                log("作図完了", out.name, f"{time.time() - t:.0f}秒", "" if peak is None else f"／作図・展開プロセスの最大メモリ {peak:.0f}MB（起動後の最大）")
             except engine.CustomError as e:
                 job["state"], job["msg"] = "error", str(e)
             except Exception as e:          # 想定外。詳細はログだけに残し、画面には出さない

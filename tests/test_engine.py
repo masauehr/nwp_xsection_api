@@ -146,3 +146,12 @@ def test_only_500hpa_height_is_selected():
     rows.append(dict(param="msl", levtype="sfc", _offset=10, _length=1))
     sel = nwp_data._ecmwf_select(rows, "ecmwf", nwp_data.PLEVELS)
     assert sorted(o for o, _ in sel) == [0, 2, 3, 9]            # gh500・t850・t500・sp だけ（gh850・gh300・msl は取らない）
+
+
+def test_children_peak_mb_after_a_child_runs():
+    """子プロセスを動かした後は、最大メモリ[MB]が取れる（Linux は KB・macOS は bytes の違いを吸収する）。"""
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, "-c", "x = bytearray(30 * 1024 * 1024)"], check=True)
+    peak = engine.children_peak_mb()
+    assert peak is not None and 30 < peak < 400
