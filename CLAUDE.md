@@ -38,3 +38,4 @@
 ## ドキュメント更新ルール
 - 変更したら `pc_docs/manuals/automation/nwp-xsection-api.md` と、このリポジトリ内のコピー `nwp-xsection-api.md` の両方、`pc_docs/README.md` の表を更新する。
 - `git add` → `git commit` → `git push`（push 前にユーザーの確認を取る）。
+- **温位エマグラム（`pt=1`・2026-11-13）**: `/api/emagram` の追加パラメータ。nwp_chart_web・tenkizu_web の `emagram.py`・`custom.py` の別コピー（直すときは3つとも）。既定は `p` に入れない（画像名が従来と同じ）。

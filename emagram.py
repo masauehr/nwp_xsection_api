@@ -92,8 +92,56 @@ def map_extent(lat, lon, dlon=12.0, dlat=8.0):
     return (lon - dlon, lon + dlon, max(-90.0, lat - dlat), min(90.0, lat + dlat))
 
 
-def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=True, ptop=100):
-    """エマグラムを1枚描画して outpath へ保存する。"""
+def _plot_mixing_lines_pt(skew, pressure, mixing_ratio, **kwargs):
+    """温位エマグラム用の等飽和混合比曲線（横軸＝温位[K]−273.15）を足す（tenkizu の温位エマグラムと同じ考え方）。"""
+    import metpy.calc as mpcalc
+    from matplotlib.collections import LineCollection
+    from metpy.units import units
+    td = mpcalc.dewpoint(mpcalc.vapor_pressure(pressure, mixing_ratio))
+    pt = mpcalc.potential_temperature(pressure, td).to("K").magnitude - 273.15
+    skew.ax.add_collection(LineCollection([np.vstack((t, pressure.m)).T for t in pt], **kwargs))
+
+
+def _draw_pt_axes(skew, fine, ptop):
+    """温位エマグラムの曲線（θ・θe・θes・θw）と軸。横軸は温位[K]。"""
+    import metpy.calc as mpcalc
+    from metpy.units import units
+    K0 = 273.15
+    p, T = fine["p"] * units.hPa, fine["T"] * units.degC
+    tdok = np.isfinite(fine["Td"])
+    pt = mpcalc.potential_temperature(p, T).to("K").magnitude - K0
+    sept = mpcalc.saturation_equivalent_potential_temperature(p, T).to("K").magnitude - K0
+    has_td = tdok.sum() >= 2                       # 露点があるのは 300hPa より下だけ（上空の湿度は信頼できない）
+    if has_td:
+        pd, td = p[tdok], fine["Td"][tdok] * units.degC
+        ept = mpcalc.equivalent_potential_temperature(pd, T[tdok], td).to("K").magnitude - K0
+        spt = mpcalc.potential_temperature(pd, td).to("K").magnitude - K0
+    shown = fine["p"] >= max(ptop, 100)            # 表示範囲の外（成層圏など）は軸の範囲に含めない
+    vals = [pt[shown], sept[shown]]
+    if has_td:
+        vals += [ept[shown[tdok]], spt[shown[tdok]]]
+    vals = np.concatenate(vals) + K0
+    vals = vals[np.isfinite(vals)]
+    lo = int(np.floor((vals.min() - 5) / 10) * 10)
+    hi = int(np.ceil((vals.max() + 5) / 10) * 10)
+    skew.ax.set_xlim(lo - K0, hi - K0)
+    skew.ax.set_ylim(max(1000.0, float(fine["p"][0]) + 5.0), ptop)
+    skew.ax.set_xticks(np.arange(lo, hi + 1, 10) - K0)
+    skew.ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: "%d" % round(x + K0)))
+    skew.ax.set_xlabel("温位 (K)", family=FONTS)
+    skew.ax.set_ylabel("気圧 (hPa)", family=FONTS)
+    mr = np.array([0.0004, 0.001, 0.002, 0.004, 0.007, 0.01, 0.016, 0.024, 0.032]).reshape(-1, 1)
+    _plot_mixing_lines_pt(skew, np.arange(1000, 99, -20) * units.hPa, mr, linestyles="dotted", colors="tab:blue", alpha=0.8)
+    skew.plot(p, pt, "black", linewidth=1.8, label="θ (温位)")
+    if has_td:
+        skew.plot(pd, ept, "g", linewidth=1.8, label="θe (相当温位)")
+    skew.plot(p, sept, "r", linewidth=1.8, label="θes (飽和相当温位)")
+    if has_td:
+        skew.plot(pd, spt, "purple", linewidth=1.5, label="θw (飽和温位)")
+
+
+def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=True, ptop=100, pt=False):
+    """エマグラムを1枚描画して outpath へ保存する。pt=True なら温位エマグラム（横軸が温位。θ・θe・θes を描く）。"""
     from metpy.plots import Hodograph, SkewT
     from metpy.units import units
     from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -104,36 +152,40 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
     fig = plt.figure(figsize=(W, H), dpi=DPI)
     fig.subplots_adjust(top=0.90, bottom=0.115, left=0.09, right=0.78)   # 右に地点の地図を置く
     skew = SkewT(fig, rotation=0, aspect=120)
-    skew.ax.set_xlim(-70, 40)
-    skew.ax.set_ylim(1000, ptop)                 # 高度設定: 表示する範囲の上端（CAPE・CIN は全層の気塊で計算するので変わらない）
-    skew.ax.set_xlabel("Temperature (°C)")
-    skew.ax.set_ylabel("Pressure (hPa)")
     p, T = fine["p"] * units.hPa, fine["T"] * units.degC
-    Td_plot = fine["Td"] * units.degC            # 300hPaより上は NaN（線が途切れる）
+    if pt:
+        _draw_pt_axes(skew, fine, ptop)          # 温位エマグラム: 気温・露点ではなく温位の曲線（持ち上げ気塊・CAPE の塗りは描かない）
+    else:
+        skew.ax.set_xlim(-70, 40)
+        skew.ax.set_ylim(1000, ptop)                 # 高度設定: 表示する範囲の上端（CAPE・CIN は全層の気塊で計算するので変わらない）
+        skew.ax.set_xlabel("Temperature (°C)")
+        skew.ax.set_ylabel("Pressure (hPa)")
+        Td_plot = fine["Td"] * units.degC            # 300hPaより上は NaN（線が途切れる）
 
-    skew.plot_dry_adiabats(t0=np.arange(203, 533, 10) * units.K, alpha=0.25, color="orangered")
-    skew.plot_moist_adiabats(t0=np.arange(203, 400, 5) * units.K, alpha=0.25, color="tab:green")
-    skew.plot_mixing_lines(pressure=np.arange(1000, 99, -20) * units.hPa, linestyle="dotted", color="tab:blue")
-    skew.plot(p, T, "r", linewidth=1.8, label="気温")
-    skew.plot(p, Td_plot, "g", linewidth=1.8, label="露点温度")
-    skew.plot(dg["pe"], dg["parcel"], "k", linewidth=2, alpha=0.55, label="持ち上げ気塊")
-    skew.plot(p[dg["i0"]], T[dg["i0"]], "ko", markerfacecolor="black")
-    skew.plot(dg["lcl_p"], dg["lcl_t"], "ko", markerfacecolor="blue")
-    if dg["el_p"] is not None and np.isfinite(dg["el_p"].magnitude):
-        skew.plot(dg["el_p"], dg["el_t"], "ko", markerfacecolor="red")
-    if dg["cape"] > 0:                    # 自由対流高度が無い（安定）場合は CIN の塗りが広範囲になり誤解を招くので塗らない
-        try:
-            skew.shade_cin(dg["pe"], dg["te"], dg["parcel"])
-            skew.shade_cape(dg["pe"], dg["te"], dg["parcel"])
-        except Exception:
-            pass
+        skew.plot_dry_adiabats(t0=np.arange(203, 533, 10) * units.K, alpha=0.25, color="orangered")
+        skew.plot_moist_adiabats(t0=np.arange(203, 400, 5) * units.K, alpha=0.25, color="tab:green")
+        skew.plot_mixing_lines(pressure=np.arange(1000, 99, -20) * units.hPa, linestyle="dotted", color="tab:blue")
+        skew.plot(p, T, "r", linewidth=1.8, label="気温")
+        skew.plot(p, Td_plot, "g", linewidth=1.8, label="露点温度")
+        skew.plot(dg["pe"], dg["parcel"], "k", linewidth=2, alpha=0.55, label="持ち上げ気塊")
+        skew.plot(p[dg["i0"]], T[dg["i0"]], "ko", markerfacecolor="black")
+        skew.plot(dg["lcl_p"], dg["lcl_t"], "ko", markerfacecolor="blue")
+        if dg["el_p"] is not None and np.isfinite(dg["el_p"].magnitude):
+            skew.plot(dg["el_p"], dg["el_t"], "ko", markerfacecolor="red")
+        if dg["cape"] > 0:                    # 自由対流高度が無い（安定）場合は CIN の塗りが広範囲になり誤解を招くので塗らない
+            try:
+                skew.shade_cin(dg["pe"], dg["te"], dg["parcel"])
+                skew.shade_cape(dg["pe"], dg["te"], dg["parcel"])
+            except Exception:
+                pass
     # 風矢羽は取得している気圧面のところだけ（kt）
     skew.plot_barbs(prof["p"] * units.hPa, (prof["u"] * KT) * units.knots, (prof["v"] * KT) * units.knots,
                     y_clip_radius=0.03)
-    skew.ax.legend(loc="lower left", bbox_to_anchor=(0.02, 0.17), fontsize=8, framealpha=0.85,
+    # 温位エマグラムは曲線が左下→右上に走るので、空いている右下に凡例と診断値・左上にホドグラフを置く
+    skew.ax.legend(loc="lower right" if pt else "lower left", bbox_to_anchor=(0.98, 0.17) if pt else (0.02, 0.17), fontsize=8, framealpha=0.85,
                    prop={"family": FONTS, "size": 8})
 
-    ia = inset_axes(skew.ax, "34%", "34%", loc=1)
+    ia = inset_axes(skew.ax, "34%", "34%", loc=2 if pt else 1)
     hod = Hodograph(ia, component_range=80.0)
     hod.add_grid(increment=20)
     hm = prof["p"] >= ptop                        # ホドグラフも表示する高度の範囲まで（2点未満なら全層）
@@ -141,10 +193,10 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
         hm = np.ones_like(hm, dtype=bool)
     hod.plot_colormapped(prof["u"][hm] * units("m/s"), prof["v"][hm] * units("m/s"), prof["h"][hm] * units.m)
 
-    skew.ax.text(0.02, 0.02,
+    skew.ax.text(0.98 if pt else 0.02, 0.02,
                  f"Parcel start: {fine['p'][dg['i0']]:.0f} hPa\nLCL: {dg['lcl_p'].magnitude:.0f} hPa\n"
                  f"CAPE: {dg['cape']:.0f} J/kg\nCIN: {dg['cin']:.0f} J/kg",
-                 transform=skew.ax.transAxes, fontsize=8, va="bottom", ha="left",
+                 transform=skew.ax.transAxes, fontsize=8, va="bottom", ha="right" if pt else "left",
                  bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8})
 
     # 地点の小地図（断面図と同じ作り）: 500hPa高度の線・海岸線・地点（赤い●）。緯度経度の数字では場所が分かりにくいため。cartopy は使わない
@@ -173,7 +225,7 @@ def render_emagram(F, init, ft, lat, lon, outpath, model="", name="", quantize=T
              f"（地表気圧 {prof['sp']:.0f}hPa）" + (f"／表示 〜{ptop}hPa" if ptop != 100 else ""), fontsize=8, family=FONTS, va="center")
     fig.text(0.006, 0.012, f"{model} INIT:{init:%m/%d %H:%M}(UTC)".strip(), fontsize=9, va="bottom")
     _caption(fig, [(f"{init:%d%H}", "#1010e0", 16), (f"<{ft}>", "#d020d0", 16),
-                      ("Emagram", "#7a5a30", 16)], y=0.045, fw=W)
+                      ("PT-Emagram" if pt else "Emagram", "#7a5a30", 16)], y=0.045, fw=W)
     fig.savefig(outpath, dpi=DPI)
     plt.close(fig)
     if quantize:

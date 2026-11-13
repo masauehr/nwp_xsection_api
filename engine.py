@@ -79,6 +79,8 @@ def validate(model, init_s, ft, q, now=None, kind="xsection"):
     c = nwp_data.CROP        # データを読む範囲の中に限る
     if kind == "emagram":
         p.update(lat=_num(q.get("lat"), "緯度", c["lat0"], c["lat1"]), lon=_num(q.get("lon"), "経度", c["lon0"], c["lon1"]))
+        if str(q.get("pt") or "").lower() in ("1", "true", "on"):      # 温位エマグラム（横軸が温位）。既定は p に入れない（画像名が従来と同じ）
+            p["pt"] = 1
         return p
     p.update(lat1=_num(q.get("lat1"), "始点の緯度", c["lat0"], c["lat1"]), lon1=_num(q.get("lon1"), "始点の経度", c["lon0"], c["lon1"]),
              lat2=_num(q.get("lat2"), "終点の緯度", c["lat0"], c["lat1"]), lon2=_num(q.get("lon2"), "終点の経度", c["lon0"], c["lon1"]))
@@ -117,7 +119,8 @@ def opts_of(p):
 def describe(p):
     """画面に出す名前（断面線＋表示要素、またはエマグラムの地点）。"""
     if p["kind"] == "emagram":
-        return f"エマグラム ({p['lat']:g}N,{p['lon']:g}E)" + (f" ｜ 上端{p['ptop']}hPa" if "ptop" in p else "")
+        return (f"{'温位エマグラム' if p.get('pt') else 'エマグラム'} ({p['lat']:g}N,{p['lon']:g}E)"
+                + (f" ｜ 上端{p['ptop']}hPa" if "ptop" in p else ""))
     base = f"断面 ({p['lat1']:g}N,{p['lon1']:g}E)→({p['lat2']:g}N,{p['lon2']:g}E)"
     return base + " ｜ " + opts.options_text(opts_of(p))
 
@@ -235,7 +238,7 @@ def render(p):
             import emagram
             try:
                 emagram.render_emagram(F, init, p["ft"], p["lat"], p["lon"], str(tmp), model=label,
-                                       ptop=p.get("ptop", opts.DEFAULT_PTOP))
+                                       ptop=p.get("ptop", opts.DEFAULT_PTOP), pt=bool(p.get("pt")))
             except ValueError as e:
                 raise CustomError(str(e))
         else:

@@ -114,3 +114,19 @@ def test_validate_ptop_for_both_kinds():
                 engine.validate("gfs", "2026111100", "12", {**q, "ptop": bad}, now=NOW, kind=kind)
     same = engine.validate("gfs", "2026111100", "12", {**q, "ptop": "100"}, now=NOW, kind="emagram")
     assert engine.image_name(same) == engine.image_name(engine.validate("gfs", "2026111100", "12", q, now=NOW, kind="emagram"))
+
+
+def test_validate_pt_emagram():
+    """温位エマグラム(pt)は既定では条件に入れず（画像名が従来と同じ）、指定すると別の画像名・説明になる。"""
+    a = engine.validate("gfs", "2026111100", "12", Q, now=NOW, kind="emagram")
+    b = engine.validate("gfs", "2026111100", "12", {**Q, "pt": "1"}, now=NOW, kind="emagram")
+    assert "pt" not in a and b["pt"] == 1 and engine.image_name(a) != engine.image_name(b)
+    assert engine.NAME_RE.fullmatch(engine.image_name(b)) and engine.describe(b).startswith("温位エマグラム")
+    x = engine.validate("gfs", "2026111100", "12", {**Q, "lat1": "45", "lon1": "130", "lat2": "25", "lon2": "130", "pt": "1"}, now=NOW, kind="xsection")
+    assert "pt" not in x                                                    # 断面図には影響しない
+
+
+def test_render_pt_emagram(tmp_path):
+    out = tmp_path / "pt.png"
+    r = emagram.render_emagram(synthetic_F(), datetime(2026, 11, 10, 18), 12, 35.7, 139.7, str(out), model="TEST", pt=True)
+    assert out.exists() and out.stat().st_size > 20_000 and "cape" in r

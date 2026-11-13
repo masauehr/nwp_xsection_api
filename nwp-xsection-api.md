@@ -100,3 +100,4 @@ python tools/make_key.py tanaka        # 合言葉（相手に渡す）と、API
 | 2026-11-12 | ローカルからの公開（nwp_chart_web の `publish.py --custom`）も、この API と同じ形式（登録日時 `pub`・`ts`＝作図した時刻）にそろえた |
 | 2026-11-12 | 断面図の色塗り「湿り（相対湿度）」に**乾燥域（相対湿度40%以下）を黄〜橙**で追加（60%以上の緑は従来どおり、40〜60%は塗らない。0-15/15-25/25-40%の3段階） |
 | 2026-11-12 | **公開先を選べるようにした**（リクエストの `site`。既定 `nwp_chart_web`・許可は `tenkizu_web` だけ。環境変数 `GITHUB_REPO_TENKIZU_WEB`）。tenkizu_web の公開サイトからも、合言葉つきで載せる・外せる。外す操作は、tenkizu_web がローカルで公開した実況エマグラム（`sounding_…png`）も対象。**同じ GITHUB_TOKEN の対象リポジトリに `masauehr/tenkizu_web` を加える必要がある**（GitHub のトークン設定） |
+| 2026-11-13 | **温位エマグラムに対応**（`/api/emagram` に `pt=1`。横軸が温位で θ・θe・θes・θw を描く。`engine.validate`・`describe`・`render` と `emagram.render_emagram(pt=True)`。既定は条件 `p` に入れず従来の画像名のまま。nwp_chart_web・tenkizu_web の画面も同日対応。エマグラムの作図メモリは従来と同程度の見込み＝MetPy の呼び出しは増えるが曲線の計算が数本増えるだけ） |
